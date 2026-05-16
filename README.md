@@ -109,6 +109,12 @@ npm start
 - `/new` 新建会话
 - `/abort` 中止当前任务
 - `/abortall` 中止当前任务并清空队列
+- `/compact [指令]` 压缩上下文
+- `/steer <消息>` 引导当前正在运行的任务
+- `/fork` 从历史消息分叉
+- `/undo` 撤回上一条回复并重新生成
+- `/export` 导出会话为 HTML
+- `/autocompact on|off` 开关自动压缩
 - `/model` 打开模型选择菜单
 - `/stream` 切换流式输出或非流式输出
 - `/thinking` 设置思考等级

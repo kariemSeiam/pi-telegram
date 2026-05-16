@@ -325,6 +325,26 @@ export class PiRpc extends EventEmitter {
     return result.path;
   }
 
+  async setAutoCompaction(enabled: boolean): Promise<void> {
+    await this.withClient((client) => client.setAutoCompaction(enabled));
+  }
+
+  async getForkMessages(): Promise<Array<{ entryId: string; text: string }>> {
+    return this.withClient((client) => client.getForkMessages());
+  }
+
+  async fork(entryId: string): Promise<{ text: string; cancelled: boolean }> {
+    return this.withClient((client) => client.fork(entryId));
+  }
+
+  async getMessages(): Promise<any[]> {
+    return this.withClient((client) => client.getMessages());
+  }
+
+  async setSessionName(name: string): Promise<void> {
+    await this.withClient((client) => client.setSessionName(name));
+  }
+
   abort(): void {
     if (!this.alive) return;
     void this.withClient((client) => client.abort()).catch(() => {});

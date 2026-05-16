@@ -114,6 +114,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
   const abortNoticeSuppressionByChat = new Map<number, number[]>();
   const ABORT_NOTICE_SUPPRESS_TTL_MS = 15_000;
+  const pendingForkMessages = new Map<number, Array<{ entryId: string; text: string }>>();
   type ActivePromptMode = "stream" | "non-stream";
   type ActivePromptState = { token: symbol; mode: ActivePromptMode; done: Promise<void> };
   type AbortDirective = { sendPartial: boolean; showAbortNotice: boolean };
@@ -427,6 +428,100 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       await tgCtx.replyWithDocument(new InputFile(path));
     } catch (err) {
       await tgCtx.reply(`❌ 导出失败：${truncate((err as Error).message, 500)}`);
+    }
+  });
+
+  commandGroup.command("fork", "从历史消息分叉", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动");
+      return;
+    }
+
+    if (inst.streaming) {
+      await tgCtx.reply("⏳ 等当前任务完成后再分叉");
+      return;
+    }
+
+    const status = await tgCtx.reply("⏳ 正在获取可分叉消息...");
+
+    try {
+      const messages = await inst.getForkMessages();
+      await status.delete().catch(() => {});
+
+      if (!messages.length) {
+        await tgCtx.reply("没有可分叉的消息");
+        return;
+      }
+
+      const recent = messages.slice(-10);
+      const lines = recent.map((m, i) => {
+        const preview = truncate(m.text, 80).replace(/\n/g, " ");
+        return `${i + 1}. ${preview}`;
+      });
+      lines.push("", "回复此消息并输入序号进行分叉，例如：3");
+
+      await tgCtx.reply(`📋 可分叉的消息（最近 ${recent.length} 条）：\n${lines.join("\n")}`);
+      pendingForkMessages.set(chatId, recent);
+    } catch (err) {
+      await status.delete().catch(() => {});
+      await tgCtx.reply(`❌ 获取失败：${truncate((err as Error).message, 500)}`);
+    }
+  });
+
+  commandGroup.command("undo", "撤回并重新生成", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动");
+      return;
+    }
+
+    if (inst.streaming) {
+      await tgCtx.reply("⏳ 等当前任务完成");
+      return;
+    }
+
+    try {
+      const lastText = await inst.getLastAssistantText();
+      if (!lastText) {
+        await tgCtx.reply("没有可撤回的回复");
+        return;
+      }
+
+      const preview = truncate(lastText, 120);
+      await tgCtx.reply(`撤回："${preview}..."\n请输入新的指令或修正。`);
+      rememberReplyMessage(replyScopeKey(tgCtx), "self", tgCtx.message!.message_id, lastText);
+    } catch (err) {
+      await tgCtx.reply(`❌ 获取失败：${truncate((err as Error).message, 500)}`);
+    }
+  });
+
+  commandGroup.command("autocompact", "自动压缩开关", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动");
+      return;
+    }
+
+    const arg = extractCommandArgs(String(tgCtx.message?.text || ""), "autocompact").trim().toLowerCase();
+
+    if (arg === "on" || arg === "1" || arg === "true") {
+      await inst.setAutoCompaction(true);
+      await tgCtx.reply("✅ 自动压缩已开启");
+    } else if (arg === "off" || arg === "0" || arg === "false") {
+      await inst.setAutoCompaction(false);
+      await tgCtx.reply("⚪ 自动压缩已关闭");
+    } else {
+      await tgCtx.reply("用法：/autocompact on|off");
     }
   });
 
@@ -1389,6 +1484,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           const processed = await applyCronToolDirectives(tgCtx, result.text);
 
           await sendReply(tgCtx, processed.text, result.tools, maxResponseLength, processed.warnings);
+          await maybeWarnContextFull(tgCtx, inst);
         } finally {
           await stream.stopAndWait();
         }
@@ -1405,6 +1501,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       await status?.delete().catch(() => {});
       const processed = await applyCronToolDirectives(tgCtx, result.text);
       await sendReply(tgCtx, processed.text, result.tools, maxResponseLength, processed.warnings);
+      await maybeWarnContextFull(tgCtx, inst);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message === "aborted") {
@@ -1464,6 +1561,34 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     if (pending) {
       const handled = await consumePendingCronInput(tgCtx, pending, text);
       if (handled) return;
+    }
+
+    // Handle pending fork selection (number input after /fork)
+    const forkMessages = pendingForkMessages.get(tgCtx.chat.id);
+    if (forkMessages) {
+      const num = parseInt(text.trim(), 10);
+      if (Number.isFinite(num) && num >= 1 && num <= forkMessages.length) {
+        const selected = forkMessages[num - 1];
+        pendingForkMessages.delete(tgCtx.chat.id);
+        const status = await tgCtx.reply(`⏳ 正在从消息 ${num} 分叉...`);
+        try {
+          const key = chatKey(botKey, tgCtx.chat.id);
+          const inst = pool.get(key);
+          const result = await inst.fork(selected.entryId);
+          await status.delete().catch(() => {});
+          if (result.cancelled) {
+            await tgCtx.reply("⚠️ 分叉被扩展取消");
+            return;
+          }
+          await tgCtx.reply(`✅ 已从消息 ${num} 分叉\n${truncate(result.text, 100)}`);
+        } catch (err) {
+          await status.delete().catch(() => {});
+          await tgCtx.reply(`❌ 分叉失败：${truncate((err as Error).message, 500)}`);
+        }
+        return;
+      }
+      // Non-number input after /fork — clear pending state and fall through
+      pendingForkMessages.delete(tgCtx.chat.id);
     }
 
     rememberReplyMessage(replyScopeKey(tgCtx), "user", tgCtx.message.message_id, text);
@@ -1886,6 +2011,23 @@ function formatMessageSender(msg: any, meId: number): string {
 
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
+}
+
+const CONTEXT_WARN_THRESHOLD = 0.85;
+
+async function maybeWarnContextFull(tgCtx: BotContext, inst: ReturnType<PiPool["get"]>): Promise<void> {
+  if (!inst?.alive) return;
+  try {
+    const stats = await inst.getSessionStats();
+    const usage = stats?.contextUsage;
+    if (!usage || typeof usage.percent !== "number" || usage.percent < CONTEXT_WARN_THRESHOLD) return;
+    const pct = usage.percent.toFixed(0);
+    const used = typeof usage.tokens === "number" ? usage.tokens : "?";
+    const total = typeof usage.contextWindow === "number" ? usage.contextWindow : "?";
+    await tgCtx.reply(`⚠️ 上下文已用 ${pct}%（${used}/${total}），建议 /compact 压缩`).catch(() => {});
+  } catch {
+    /* best-effort */
+  }
 }
 
 function describeTelegramSendError(err: unknown): string {
