@@ -304,6 +304,27 @@ export class PiRpc extends EventEmitter {
     return this.withClient((client) => client.setThinkingLevel(level as any));
   }
 
+  async compact(customInstructions?: string): Promise<void> {
+    await this.withClient((client) => client.compact(customInstructions));
+  }
+
+  async steer(message: string): Promise<void> {
+    await this.withClient((client) => client.steer(message));
+  }
+
+  async followUp(message: string): Promise<void> {
+    await this.withClient((client) => client.followUp(message));
+  }
+
+  async getLastAssistantText(): Promise<string | null> {
+    return this.withClient((client) => client.getLastAssistantText());
+  }
+
+  async exportHtml(outputPath?: string): Promise<string> {
+    const result = await this.withClient((client) => client.exportHtml(outputPath));
+    return result.path;
+  }
+
   abort(): void {
     if (!this.alive) return;
     void this.withClient((client) => client.abort()).catch(() => {});

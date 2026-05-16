@@ -4,7 +4,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { Bot, GrammyError, HttpError, type Context } from "grammy";
+import { Bot, GrammyError, HttpError, type Context, InputFile } from "grammy";
 import type { ReplyParameters } from "@grammyjs/types";
 import { autoRetry } from "@grammyjs/auto-retry";
 import { hydrate, type HydrateFlavor } from "@grammyjs/hydrate";
@@ -347,6 +347,88 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     }
   });
 
+
+  commandGroup.command("compact", "压缩上下文", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动，发条消息先");
+      return;
+    }
+
+    if (inst.streaming) {
+      await tgCtx.reply("⏳ 当前正在生成，请先 /abort");
+      return;
+    }
+
+    const instructions = extractCommandArgs(String(tgCtx.message?.text || ""), "compact");
+    const status = await tgCtx.reply("⏳ 正在压缩上下文...");
+
+    try {
+      await inst.compact(instructions || undefined);
+      await status.delete().catch(() => {});
+      await tgCtx.reply("✅ 上下文已压缩");
+    } catch (err) {
+      await status.delete().catch(() => {});
+      await tgCtx.reply(`❌ 压缩失败：${truncate((err as Error).message, 1000)}`);
+    }
+  });
+
+  commandGroup.command("steer", "引导当前任务", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动");
+      return;
+    }
+
+    if (!inst.streaming) {
+      await tgCtx.reply("当前无运行中的任务");
+      return;
+    }
+
+    const text = extractCommandArgs(String(tgCtx.message?.text || ""), "steer");
+    if (!text.trim()) {
+      await tgCtx.reply("用法：/steer <消息>");
+      return;
+    }
+
+    rememberReplyMessage(replyScopeKey(tgCtx), "user", tgCtx.message!.message_id, text);
+    try {
+      await inst.steer(text);
+      await tgCtx.reply("📤 已发送引导");
+    } catch (err) {
+      await tgCtx.reply(`❌ 发送失败：${truncate((err as Error).message, 500)}`);
+    }
+  });
+
+  commandGroup.command("export", "导出会话为 HTML", async (tgCtx) => {
+    const chatId = tgCtx.chat.id;
+    const key = chatKey(botKey, chatId);
+    const inst = pool.has(key);
+
+    if (!inst?.alive) {
+      await tgCtx.reply("会话未启动");
+      return;
+    }
+
+    if (inst.streaming) {
+      await tgCtx.reply("⏳ 等当前任务完成后再导出");
+      return;
+    }
+
+    try {
+      const path = await inst.exportHtml();
+      await tgCtx.reply("📄 会话已导出");
+      await tgCtx.replyWithDocument(new InputFile(path));
+    } catch (err) {
+      await tgCtx.reply(`❌ 导出失败：${truncate((err as Error).message, 500)}`);
+    }
+  });
 
   commandGroup.command("model", "切换模型", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
