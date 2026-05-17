@@ -502,28 +502,6 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     }
   });
 
-  commandGroup.command("autocompact", "Toggle auto-compaction", async (tgCtx) => {
-    const chatId = tgCtx.chat.id;
-    const key = chatKey(botKey, chatId);
-    const inst = pool.has(key);
-
-    if (!inst?.alive) {
-      await tgCtx.reply("Session not started");
-      return;
-    }
-
-    const arg = extractCommandArgs(String(tgCtx.message?.text || ""), "autocompact").trim().toLowerCase();
-
-    if (arg === "on" || arg === "1" || arg === "true") {
-      await inst.setAutoCompaction(true);
-      await tgCtx.reply("✅ Auto-compaction enabled");
-    } else if (arg === "off" || arg === "0" || arg === "false") {
-      await inst.setAutoCompaction(false);
-      await tgCtx.reply("⚪ Auto-compaction disabled");
-    } else {
-      await tgCtx.reply("Usage: /autocompact on|off");
-    }
-  });
 
   commandGroup.command("model", "Switch model", async (tgCtx) => {
     const chatId = tgCtx.chat.id;

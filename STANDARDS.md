@@ -62,7 +62,6 @@ src/
 | `/undo` | Undo last reply + fork |
 | `/export` | Export session as HTML |
 | `/fork` | List forkable messages |
-| `/autocompact on\|off` | Toggle auto-compaction |
 | `/model` | Open model selector menu |
 | `/output` | Toggle streaming/non-streaming |
 | `/thinking` | Set thinking level |
