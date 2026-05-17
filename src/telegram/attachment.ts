@@ -80,7 +80,7 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
 
     if (url) {
       if (!isValidHttpUrl(url)) {
-        warnings.push(`附件 ${label} 的 URL 非法`);
+        warnings.push(`Attachment ${label} has an invalid URL`);
         continue;
       }
       try {
@@ -89,31 +89,31 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
           : new InputFile(new URL(url));
         attachments.push({ kind, media, label });
       } catch {
-        warnings.push(`附件 ${label} 的 URL 解析失败`);
+        warnings.push(`Attachment ${label} URL parse failed`);
       }
       continue;
     }
 
     if (localPath) {
       if (!existsSync(localPath)) {
-        warnings.push(`附件 ${label} 的本地路径不存在`);
+        warnings.push(`Attachment ${label} local path does not exist`);
         continue;
       }
       let size = 0;
       try {
         const st = statSync(localPath);
         if (!st.isFile()) {
-          warnings.push(`附件 ${label} 的本地路径不是文件`);
+          warnings.push(`Attachment ${label} local path is not a file`);
           continue;
         }
         size = st.size;
       } catch {
-        warnings.push(`附件 ${label} 的本地路径无法读取`);
+        warnings.push(`Attachment ${label} local path cannot be read`);
         continue;
       }
 
       if (size > MAX_UPLOAD_BYTES) {
-        warnings.push(`附件 ${label} 超过大小限制（>${MAX_UPLOAD_BYTES} bytes）`);
+        warnings.push(`Attachment ${label} exceeds size limit (>${MAX_UPLOAD_BYTES} bytes)`);
         continue;
       }
 
@@ -133,7 +133,7 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
         data = Buffer.from(normalized, "base64");
         if (!data.length) throw new Error("decoded bytes is empty");
       } catch (err) {
-        warnings.push(`附件 ${label} 解析失败：${(err as Error).message}`);
+        warnings.push(`Attachment ${label} parse failed: ${(err as Error).message}`);
         continue;
       }
     } else {
@@ -141,7 +141,7 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
     }
 
     if (data.byteLength > MAX_UPLOAD_BYTES) {
-      warnings.push(`附件 ${label} 超过大小限制（>${MAX_UPLOAD_BYTES} bytes）`);
+      warnings.push(`Attachment ${label} exceeds size limit (>${MAX_UPLOAD_BYTES} bytes)`);
       continue;
     }
 

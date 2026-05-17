@@ -61,7 +61,7 @@ export function extractTgReplyDirective(input: string): ReplyDirectiveExtraction
       const attrs = parseAttrs(m[1] ?? "");
       directive = buildDirective(attrs, m[2] ?? "", warnings);
     } else {
-      warnings.push("检测到多个 tg-reply 标签，仅使用第一个");
+      warnings.push("Multiple tg-reply tags detected, only using the first one");
     }
   }
 
@@ -83,13 +83,13 @@ export function resolveReplyParameters(
 
   const list = histories.get(scope) ?? [];
   if (!list.length) {
-    warnings.push("回复工具未找到可引用的历史消息");
+    warnings.push("Reply tool: No replyable message history found");
     return { warnings };
   }
 
   const target = selectTarget(list, directive);
   if (!target) {
-    warnings.push("回复工具未匹配到目标消息，已退化为普通回复");
+    warnings.push("Reply tool: No matching target message found, fell back to normal reply");
     return { warnings };
   }
 
@@ -106,7 +106,7 @@ export function resolveReplyParameters(
       params.quote = quote;
       params.quote_position = pos;
     } else {
-      warnings.push("回复工具未匹配到 quote 片段，已仅按消息回复");
+      warnings.push("Reply tool: quote fragment not matched, replying by message only");
     }
   }
 
@@ -158,7 +158,7 @@ function buildDirective(
   }
 
   if (!contains && !quote) {
-    warnings.push("tg-reply 缺少定位信息（message_id 或 contains/quote）");
+    warnings.push("tg-reply missing targeting info (message_id or contains/quote)");
     return undefined;
   }
 

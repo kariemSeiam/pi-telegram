@@ -42,21 +42,21 @@ export function formatContextUsage(
     ? ` (${usage.percent.toFixed(usage.percent >= 10 || Number.isInteger(usage.percent) ? 0 : 1)}%)`
     : "";
 
-  return `📦 上下文占用: ${used} / ${total}${percent}`;
+  return `📦 Context usage: ${used} / ${total}${percent}`;
 }
 
 export function buildStatusLines(snapshot: BotStatusSnapshot): string[] {
   const lines: Array<string | undefined> = [
-    `${snapshot.alive ? "✅ 运行中" : "💤 未启动"} | ${snapshot.processing ? "⏳ 处理中" : "🟢 空闲"}`,
-    snapshot.providerLabel ? `🏢 供应商: ${snapshot.providerLabel}` : undefined,
-    `🤖 模型: ${snapshot.modelLabel}`,
-    `⚙️ 输出: ${snapshot.streamEnabled ? "流式" : "非流式"}`,
-    snapshot.thinkingLabel ? `🧠 思考: ${snapshot.thinkingLabel}` : undefined,
-    snapshot.sessionLabel ? `🗂 会话: ${snapshot.sessionLabel}` : undefined,
-    typeof snapshot.cost === "number" && snapshot.cost > 0 ? `💰 花费: $${formatCost(snapshot.cost)}` : undefined,
+    `${snapshot.alive ? "✅ Running" : "💤 Not started"} | ${snapshot.processing ? "⏳ Processing" : "🟢 Idle"}`,
+    snapshot.providerLabel ? `🏢 Provider: ${snapshot.providerLabel}` : undefined,
+    `🤖 Model: ${snapshot.modelLabel}`,
+    `⚙️ Output: ${snapshot.streamEnabled ? "Streaming" : "Non-streaming"}`,
+    snapshot.thinkingLabel ? `🧠 Thinking: ${snapshot.thinkingLabel}` : undefined,
+    snapshot.sessionLabel ? `🗂 Session: ${snapshot.sessionLabel}` : undefined,
+    typeof snapshot.cost === "number" && snapshot.cost > 0 ? `💰 Cost: $${formatCost(snapshot.cost)}` : undefined,
     formatContextUsage(snapshot.contextUsage),
-    `📊 活跃: ${snapshot.activeCount}`,
-    `⏰ 定时: ${snapshot.cron.enabled ? "开启" : "关闭"} | 任务 ${snapshot.cron.totalJobs}（启用 ${snapshot.cron.enabledJobs}）`,
+    `📊 Active: ${snapshot.activeCount}`,
+    `⏰ Cron: ${snapshot.cron.enabled ? "Enabled" : "Disabled"} | Jobs ${snapshot.cron.totalJobs} (Enabled ${snapshot.cron.enabledJobs})`,
   ];
 
   return lines.filter((line): line is string => Boolean(line));

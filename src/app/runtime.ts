@@ -68,10 +68,10 @@ function startRunnerWithAutoRestart(
     if (shuttingDown) return;
     if (retryTimer) return;
     const delaySec = Math.max(1, Math.round(delayMs / 1000));
-    log.warn(`"${botName}" 轮询已停止（${reason}），${delaySec} 秒后重试`);
+    log.warn(`"${botName}" polling stopped (${reason}), retrying in ${delaySec}s`);
     retryTimer = setTimeout(() => {
       retryTimer = null;
-      log.warn(`"${botName}" 正在重启 Telegram 轮询...`);
+      log.warn(`"${botName}" restarting Telegram polling...`);
       start();
     }, delayMs);
   };
@@ -91,15 +91,15 @@ function startRunnerWithAutoRestart(
         if (runner !== current) return;
 
         const code = getTelegramErrorCode(err);
-        log.error("boot", `"${botName}" 轮询异常：${describeRunnerError(err)}`);
+        log.error("boot", `"${botName}" polling error: ${describeRunnerError(err)}`);
 
         if (code === 401) {
-          log.warn(`"${botName}" token 可能无效/已失效，请检查 settings.json（本次不自动重启）`);
+          log.warn(`"${botName}" token may be invalid/expired, please check settings.json (auto-restart skipped for this session)`);
           return;
         }
 
         if (code === 409) {
-          log.warn(`"${botName}" 可能存在重复实例（同 token 多进程轮询）`);
+          log.warn(`"${botName}" possible duplicate instance (same token polled by multiple processes)`);
           scheduleRestart("runner crashed code=409", 15000);
           return;
         }
@@ -118,7 +118,7 @@ function startRunnerWithAutoRestart(
       });
       watch(runner);
     } catch (err) {
-      log.error("boot", `"${botName}" 启动轮询失败：${describeRunnerError(err)}`);
+      log.error("boot", `"${botName}" failed to start polling: ${describeRunnerError(err)}`);
       scheduleRestart("start failed");
     }
   };
@@ -158,8 +158,8 @@ export async function runApp(): Promise<void> {
   const { name: packageName, version: appVersion } = getPackageMeta();
 
   if (ensureSettingsFileExists(appVersion)) {
-    log.warn(`settings.json 不存在，已自动生成模板: ${settingsPath}`);
-    log.warn("请先填写 bot token，再重新启动。\n");
+    log.warn(`settings.json does not exist, auto-generated template: ${settingsPath}`);
+    log.warn("Please fill in your bot token, then restart.\n");
     process.exit(1);
     return;
   }
@@ -175,7 +175,7 @@ export async function runApp(): Promise<void> {
   } else if (config.lastChangelogVersion !== appVersion) {
     const changelogText = getNewChangelogText(config.lastChangelogVersion);
     if (changelogText) {
-      log.warn(`检测到新版本变更（${config.lastChangelogVersion} -> ${appVersion}）：`);
+      log.warn(`New version change detected (${config.lastChangelogVersion} -> ${appVersion}):`);
       for (const line of changelogText.split(/\r?\n/)) {
         if (line.trim()) log.warn(line);
       }
@@ -188,7 +188,7 @@ export async function runApp(): Promise<void> {
   if (shouldCheckUpdatesOnStartup()) {
     void checkLatestVersion(packageName, appVersion).then((newVersion) => {
       if (!newVersion) return;
-      log.warn(`发现新版本 ${newVersion} 可用。${getUpdateInstruction(packageName)}`);
+      log.warn(`New version ${newVersion} available. ${getUpdateInstruction(packageName)}`);
       log.warn("Changelog: https://github.com/Ziphyrien/Pi-Telegram/blob/main/CHANGELOG.md");
     });
   }
@@ -265,7 +265,7 @@ export async function runApp(): Promise<void> {
         try {
           await queueWriteSettings();
         } catch (err) {
-          log.error("config", `保存流式配置失败 (${botCfg.name}:${key}=${enabled ? 1 : 0}): ${formatErr(err)}`);
+          log.error("config", `Failed to save stream config (${botCfg.name}:${key}=${enabled ? 1 : 0}): ${formatErr(err)}`);
           throw err;
         }
       },
@@ -281,7 +281,7 @@ export async function runApp(): Promise<void> {
 
   if (needsSettingsRewrite) {
     queueWriteSettings().catch((err) => {
-      log.error("config", `写回 settings.json 失败：${formatErr(err)}`);
+      log.error("config", `Failed to write back settings.json: ${formatErr(err)}`);
     });
   }
 

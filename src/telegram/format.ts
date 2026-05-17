@@ -154,7 +154,7 @@ export function mdToTgHtml(text: string): string {
     : normalizeTelegramHtml(sanitize(html, tgAllowed));
 
   // Telegram accepts plain text too; avoid empty HTML payloads
-  return safe || "(无回复)";
+  return safe || "(no reply)";
 }
 
 export function mdToPlainText(text: string): string {
@@ -167,5 +167,5 @@ export function mdToPlainText(text: string): string {
     ? normalized.replace(/\n{3,}/g, "\n\n")
     : normalized;
 
-  return collapsed.trim() || "(无回复)";
+  return collapsed.trim() || "(no reply)";
 }

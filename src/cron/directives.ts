@@ -37,7 +37,7 @@ export function extractTgCronDirectives(input: string): CronDirectiveExtraction 
     last = TAG_RE.lastIndex;
 
     if (directives.length >= 8) {
-      warnings.push("tg-cron 指令过多，仅处理前 8 条");
+      warnings.push("Too many tg-cron directives, only the first 8 will be processed");
       continue;
     }
 
@@ -65,7 +65,7 @@ function buildDirective(
   const actionRaw = attrs.action || attrs.op || attrs.cmd || attrs.type || "";
   const action = normalizeAction(actionRaw);
   if (!action) {
-    warnings.push(`tg-cron 缺少或不支持 action: ${actionRaw || "(empty)"}`);
+    warnings.push(`tg-cron missing or unsupported action: ${actionRaw || "(empty)"}`);
     return undefined;
   }
 
@@ -76,7 +76,7 @@ function buildDirective(
   const id = String(attrs.id || attrs.job_id || attrs.jobid || "").trim();
   if (action === "on" || action === "off" || action === "del" || action === "run") {
     if (!id) {
-      warnings.push(`tg-cron action=${action} 缺少 id`);
+      warnings.push(`tg-cron action=${action} missing id`);
       return undefined;
     }
     return { action, id };
@@ -84,13 +84,13 @@ function buildDirective(
 
   if (action === "rename") {
     if (!id) {
-      warnings.push("tg-cron action=rename 缺少 id");
+      warnings.push("tg-cron action=rename missing id");
       return undefined;
     }
 
     const name = String(attrs.name || attrs.title || body || "").trim();
     if (!name) {
-      warnings.push("tg-cron action=rename 缺少 name/title 或标签体内容");
+      warnings.push("tg-cron action=rename missing name/title or tag body content");
       return undefined;
     }
 
@@ -100,13 +100,13 @@ function buildDirective(
   const kindRaw = attrs.kind || attrs.schedule || "";
   const kind = normalizeKind(kindRaw);
   if (!kind) {
-    warnings.push(`tg-cron add 缺少或不支持 kind: ${kindRaw || "(empty)"}`);
+    warnings.push(`tg-cron add missing or unsupported kind: ${kindRaw || "(empty)"}`);
     return undefined;
   }
 
   const prompt = String(attrs.prompt || attrs.message || attrs.task || body || "").trim();
   if (!prompt) {
-    warnings.push("tg-cron add 缺少 prompt/message/task 或标签体内容");
+    warnings.push("tg-cron add missing prompt/message/task or tag body content");
     return undefined;
   }
 
@@ -117,17 +117,17 @@ function buildDirective(
   const timezone = String(attrs.timezone || attrs.tz || "").trim() || undefined;
 
   if (kind === "at" && !at) {
-    warnings.push("tg-cron add kind=at 缺少 at 时间");
+    warnings.push("tg-cron add kind=at missing at time");
     return undefined;
   }
 
   if (kind === "every" && !every) {
-    warnings.push("tg-cron add kind=every 缺少 every 间隔");
+    warnings.push("tg-cron add kind=every missing every interval");
     return undefined;
   }
 
   if (kind === "cron" && !expr) {
-    warnings.push("tg-cron add kind=cron 缺少 expr 表达式");
+    warnings.push("tg-cron add kind=cron missing expr expression");
     return undefined;
   }
 

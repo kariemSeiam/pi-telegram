@@ -26,7 +26,7 @@ export interface CreateBotMenusOptions {
 
 export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): BotMenus<C> {
   const { botIndex, botKey, pool } = opts;
-  const outdatedMenuText = opts.outdatedMenuText ?? "菜单已更新，请重试";
+  const outdatedMenuText = opts.outdatedMenuText ?? "Menu updated, please try again";
 
   const cachedModels = new Map<number, PiModelInfo[]>(); // chatId -> models
   const modelCacheAt = new Map<number, number>();        // chatId -> cache timestamp
@@ -73,12 +73,12 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
 
   function thinkingLabel(level: string): string {
     switch (level) {
-      case "off": return "关闭 (off)";
-      case "minimal": return "极低 (minimal)";
-      case "low": return "低 (low)";
-      case "medium": return "中 (medium)";
-      case "high": return "高 (high)";
-      case "xhigh": return "极高 (xhigh)";
+      case "off": return "Off";
+      case "minimal": return "Minimal";
+      case "low": return "Low";
+      case "medium": return "Medium";
+      case "high": return "High";
+      case "xhigh": return "Extra High";
       default: return level;
     }
   }
@@ -190,21 +190,21 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       const models = await ensureModelsForChat(chatId);
       const providers = [...new Set(models.map((m) => m.provider))];
 
-      range.text("🔄 刷新模型列表", async (ctx) => {
+      range.text("🔄 Refresh Models", async (ctx) => {
         const cid = ctx.chat?.id ?? 0;
         try {
           await refreshModelsForChat(cid);
           try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-          await ctx.answerCallbackQuery({ text: "模型列表已刷新" });
+          await ctx.answerCallbackQuery({ text: "Model list refreshed" });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          await ctx.answerCallbackQuery({ text: `❌ 刷新失败：${msg}`.slice(0, 180) });
+          await ctx.answerCallbackQuery({ text: `❌ Refresh failed: ${msg}`.slice(0, 180) });
         }
       }).row();
 
       if (!providers.length) {
-        range.text("⚠️ 无可用模型（pi 未启动？）", (ctx) =>
-          ctx.answerCallbackQuery({ text: "请先发一条消息启动 pi" }),
+        range.text("⚠️ No models available (pi not started?)", (ctx) =>
+          ctx.answerCallbackQuery({ text: "Please send a message to start pi first" }),
         );
         return;
       }
@@ -240,15 +240,15 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
         const models = await ensureModelsForChat(chatId);
         const current = activeModelId.get(chatId);
 
-        range.text("🔄 刷新", async (ctx) => {
+        range.text("🔄 Refresh", async (ctx) => {
           const cid = ctx.chat?.id ?? 0;
           try {
             await refreshModelsForChat(cid);
             try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-            await ctx.answerCallbackQuery({ text: "已刷新" });
+            await ctx.answerCallbackQuery({ text: "Refreshed" });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            await ctx.answerCallbackQuery({ text: `❌ 刷新失败：${msg}`.slice(0, 180) });
+            await ctx.answerCallbackQuery({ text: `❌ Refresh failed: ${msg}`.slice(0, 180) });
           }
         }).row();
 
@@ -261,7 +261,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
             const cid = ctx.chat?.id ?? 0;
             const currentKey = activeModelId.get(cid);
             if (currentKey === keyOfModel) {
-              await ctx.answerCallbackQuery({ text: `已是当前模型：${mo.name}` });
+              await ctx.answerCallbackQuery({ text: `Already current model: ${mo.name}` });
               return;
             }
 
@@ -276,10 +276,10 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
             }
 
             try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-            await ctx.answerCallbackQuery({ text: `✅ 已切换：${mo.name}` });
+            await ctx.answerCallbackQuery({ text: `✅ Switched to: ${mo.name}` });
           }).row();
         }
-        range.back("⬅️ 返回", (ctx) => ctx.answerCallbackQuery());
+        range.back("⬅️ Back", (ctx) => ctx.answerCallbackQuery());
       });
 
     modelMenu.register(sub);
@@ -296,37 +296,37 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       const chatId = ctx.chat?.id ?? 0;
       const enabled = isStreamEnabled(chatId);
 
-      range.text(`${enabled ? "✅ " : ""}流式输出`, async (ctx) => {
+      range.text(`${enabled ? "✅ " : ""}Streaming Output`, async (ctx) => {
         const cid = ctx.chat?.id ?? 0;
         if (isStreamEnabled(cid)) {
-          await ctx.answerCallbackQuery({ text: "当前已是流式输出" });
+          await ctx.answerCallbackQuery({ text: "Already streaming output" });
           return;
         }
 
         try {
           await setStreamEnabled(cid, true);
           try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-          await ctx.answerCallbackQuery({ text: "已切换为流式输出" });
+          await ctx.answerCallbackQuery({ text: "Switched to streaming output" });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          await ctx.answerCallbackQuery({ text: `❌ 保存失败：${msg}`.slice(0, 180) });
+          await ctx.answerCallbackQuery({ text: `❌ Save failed: ${msg}`.slice(0, 180) });
         }
       }).row();
 
-      range.text(`${!enabled ? "✅ " : ""}非流式输出`, async (ctx) => {
+      range.text(`${!enabled ? "✅ " : ""}Non-Streaming Output`, async (ctx) => {
         const cid = ctx.chat?.id ?? 0;
         if (!isStreamEnabled(cid)) {
-          await ctx.answerCallbackQuery({ text: "当前已是非流式输出" });
+          await ctx.answerCallbackQuery({ text: "Already non-streaming output" });
           return;
         }
 
         try {
           await setStreamEnabled(cid, false);
           try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-          await ctx.answerCallbackQuery({ text: "已切换为非流式输出" });
+          await ctx.answerCallbackQuery({ text: "Switched to non-streaming output" });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          await ctx.answerCallbackQuery({ text: `❌ 保存失败：${msg}`.slice(0, 180) });
+          await ctx.answerCallbackQuery({ text: `❌ Save failed: ${msg}`.slice(0, 180) });
         }
       });
     });
@@ -344,23 +344,23 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       const chatId = ctx.chat?.id ?? 0;
       const supported = await supportsThinkingForChat(chatId);
       if (!supported) {
-        range.text("当前模型不支持思考等级", (ctx) =>
-          ctx.answerCallbackQuery({ text: "当前模型不支持思考等级" }),
+        range.text("Current model does not support thinking levels", (ctx) =>
+          ctx.answerCallbackQuery({ text: "Current model does not support thinking levels" }),
         );
         return;
       }
 
       const current = await ensureThinkingForChat(chatId);
 
-      range.text("🔄 刷新状态", async (ctx) => {
+      range.text("🔄 Refresh Status", async (ctx) => {
         const cid = ctx.chat?.id ?? 0;
         try {
           await refreshThinkingForChat(cid);
           try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-          await ctx.answerCallbackQuery({ text: "思考状态已刷新" });
+          await ctx.answerCallbackQuery({ text: "Thinking status refreshed" });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          await ctx.answerCallbackQuery({ text: `❌ 刷新失败：${msg}`.slice(0, 180) });
+          await ctx.answerCallbackQuery({ text: `❌ Refresh failed: ${msg}`.slice(0, 180) });
         }
       }).row();
 
@@ -370,7 +370,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
           const cid = ctx.chat?.id ?? 0;
           const now = activeThinkingLevel.get(cid) ?? "";
           if (now === level) {
-            await ctx.answerCallbackQuery({ text: `当前已是 ${thinkingLabel(level)}` });
+            await ctx.answerCallbackQuery({ text: `Already set to ${thinkingLabel(level)}` });
             return;
           }
 
@@ -379,7 +379,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
             await inst.rpcSetThinkingLevel(level);
             activeThinkingLevel.set(cid, level);
             try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
-            await ctx.answerCallbackQuery({ text: `✅ 已切换为 ${thinkingLabel(level)}` });
+            await ctx.answerCallbackQuery({ text: `✅ Switched to ${thinkingLabel(level)}` });
           } catch (err) {
             await ctx.answerCallbackQuery({ text: `❌ ${(err as Error).message}` });
           }

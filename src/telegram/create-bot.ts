@@ -87,7 +87,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     botIndex,
     botKey,
     pool,
-    outdatedMenuText: "菜单已更新，请重试",
+    outdatedMenuText: "Menu updated, please retry",
     initialStreamByChat,
     onStreamModeChange,
   });
@@ -105,7 +105,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       if (config.allowedUsers.includes(uid!) || config.allowedUsers.includes(uname!)) {
         return next();
       }
-      await tgCtx.reply("⛔ 无权限");
+      await tgCtx.reply("⛔ Unauthorized");
     });
   }
 
@@ -214,11 +214,11 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     return { aborted: true, mode: active.mode };
   };
 
-  commandGroup.command("status", "查看状态", async (tgCtx) => {
+  commandGroup.command("status", "View status", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
-    let modelLabel = "默认";
+    let modelLabel = "Default";
     let providerLabel = "";
     let thinkingSupported = true;
     let thinkingLabel = "";
@@ -269,7 +269,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     await tgCtx.reply(lines.join("\n"));
   });
 
-  commandGroup.command("new", "新建会话", async (tgCtx) => {
+  commandGroup.command("new", "New session", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
@@ -284,20 +284,20 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
     try {
       await pool.getFresh(key);
-      await tgCtx.reply("🆕 已新建会话");
+      await tgCtx.reply("🆕 New session created");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await tgCtx.reply(`❌ 新建会话失败：${truncate(message, 1000)}`);
+      await tgCtx.reply(`❌ Failed to create session: ${truncate(message, 1000)}`);
     }
   });
 
-  commandGroup.command("abort", "中止当前操作", async (tgCtx) => {
+  commandGroup.command("abort", "Abort current operation", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("当前无操作");
+      await tgCtx.reply("No active operation");
       return;
     }
 
@@ -309,26 +309,26 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
     if (stopped.aborted) {
       if (queued > 0) {
-        await tgCtx.reply(`📥 队列保留 ${queued} 条，继续执行中\n如需清空队列可用 /abortall`);
+        await tgCtx.reply(`📥 Queue retained ${queued} items, continuing\nUse /abortall to clear the queue`);
       }
       return;
     }
 
     if (queued > 0) {
-      await tgCtx.reply(`当前无运行任务，队列中还有 ${queued} 条`);
+      await tgCtx.reply(`No running task, ${queued} items in queue`);
       return;
     }
 
-    await tgCtx.reply("当前无操作");
+    await tgCtx.reply("No active operation");
   });
 
-  commandGroup.command("abortall", "中止并清空队列", async (tgCtx) => {
+  commandGroup.command("abortall", "Abort and clear queue", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive || (!inst.running && inst.queuedCount === 0)) {
-      await tgCtx.reply("当前无操作");
+      await tgCtx.reply("No active operation");
       return;
     }
 
@@ -339,121 +339,121 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     });
 
     if (cleared > 0) {
-      await tgCtx.reply(`🧹 已清空队列 ${cleared} 条`);
+      await tgCtx.reply(`🧹 Cleared ${cleared} items in queue`);
       return;
     }
 
     if (!stopped.aborted) {
-      await tgCtx.reply("当前无运行任务");
+      await tgCtx.reply("No running task");
     }
   });
 
 
-  commandGroup.command("compact", "压缩上下文", async (tgCtx) => {
+  commandGroup.command("compact", "Compact context", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动，发条消息先");
+      await tgCtx.reply("Session not started, send a message first");
       return;
     }
 
     if (inst.streaming) {
-      await tgCtx.reply("⏳ 当前正在生成，请先 /abort");
+      await tgCtx.reply("⏳ Currently generating, /abort first");
       return;
     }
 
     const instructions = extractCommandArgs(String(tgCtx.message?.text || ""), "compact");
-    const status = await tgCtx.reply("⏳ 正在压缩上下文...");
+    const status = await tgCtx.reply("⏳ Compacting context...");
 
     try {
       await inst.compact(instructions || undefined);
       await status.delete().catch(() => {});
-      await tgCtx.reply("✅ 上下文已压缩");
+      await tgCtx.reply("✅ Context compacted");
     } catch (err) {
       await status.delete().catch(() => {});
-      await tgCtx.reply(`❌ 压缩失败：${truncate((err as Error).message, 1000)}`);
+      await tgCtx.reply(`❌ Compaction failed: ${truncate((err as Error).message, 1000)}`);
     }
   });
 
-  commandGroup.command("steer", "引导当前任务", async (tgCtx) => {
+  commandGroup.command("steer", "Steer current task", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动");
+      await tgCtx.reply("Session not started");
       return;
     }
 
     if (!inst.streaming) {
-      await tgCtx.reply("当前无运行中的任务");
+      await tgCtx.reply("No running task");
       return;
     }
 
     const text = extractCommandArgs(String(tgCtx.message?.text || ""), "steer");
     if (!text.trim()) {
-      await tgCtx.reply("用法：/steer <消息>");
+      await tgCtx.reply("Usage: /steer <message>");
       return;
     }
 
     rememberReplyMessage(replyScopeKey(tgCtx), "user", tgCtx.message!.message_id, text);
     try {
       await inst.steer(text);
-      await tgCtx.reply("📤 已发送引导");
+      await tgCtx.reply("📤 Steer sent");
     } catch (err) {
-      await tgCtx.reply(`❌ 发送失败：${truncate((err as Error).message, 500)}`);
+      await tgCtx.reply(`❌ Send failed: ${truncate((err as Error).message, 500)}`);
     }
   });
 
-  commandGroup.command("export", "导出会话为 HTML", async (tgCtx) => {
+  commandGroup.command("export", "Export session as HTML", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动");
+      await tgCtx.reply("Session not started");
       return;
     }
 
     if (inst.streaming) {
-      await tgCtx.reply("⏳ 等当前任务完成后再导出");
+      await tgCtx.reply("⏳ Wait for current task to finish before exporting");
       return;
     }
 
     try {
       const path = await inst.exportHtml();
-      await tgCtx.reply("📄 会话已导出");
+      await tgCtx.reply("📄 Session exported");
       await tgCtx.replyWithDocument(new InputFile(path));
     } catch (err) {
-      await tgCtx.reply(`❌ 导出失败：${truncate((err as Error).message, 500)}`);
+      await tgCtx.reply(`❌ Export failed: ${truncate((err as Error).message, 500)}`);
     }
   });
 
-  commandGroup.command("fork", "从历史消息分叉", async (tgCtx) => {
+  commandGroup.command("fork", "Fork from history message", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动");
+      await tgCtx.reply("Session not started");
       return;
     }
 
     if (inst.streaming) {
-      await tgCtx.reply("⏳ 等当前任务完成后再分叉");
+      await tgCtx.reply("⏳ Wait for current task to finish before forking");
       return;
     }
 
-    const status = await tgCtx.reply("⏳ 正在获取可分叉消息...");
+    const status = await tgCtx.reply("⏳ Fetching forkable messages...");
 
     try {
       const messages = await inst.getForkMessages();
       await status.delete().catch(() => {});
 
       if (!messages.length) {
-        await tgCtx.reply("没有可分叉的消息");
+        await tgCtx.reply("No forkable messages");
         return;
       }
 
@@ -462,53 +462,53 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const preview = truncate(m.text, 80).replace(/\n/g, " ");
         return `${i + 1}. ${preview}`;
       });
-      lines.push("", "回复此消息并输入序号进行分叉，例如：3");
+      lines.push("", "Reply to this message with the number to fork, e.g.: 3");
 
-      await tgCtx.reply(`📋 可分叉的消息（最近 ${recent.length} 条）：\n${lines.join("\n")}`);
+      await tgCtx.reply(`📋 Forkable messages (latest ${recent.length} items in queue)：\n${lines.join("\n")}`);
       pendingForkMessages.set(chatId, recent);
     } catch (err) {
       await status.delete().catch(() => {});
-      await tgCtx.reply(`❌ 获取失败：${truncate((err as Error).message, 500)}`);
+      await tgCtx.reply(`❌ Fetch failed: ${truncate((err as Error).message, 500)}`);
     }
   });
 
-  commandGroup.command("undo", "撤回并重新生成", async (tgCtx) => {
+  commandGroup.command("undo", "Undo and regenerate", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动");
+      await tgCtx.reply("Session not started");
       return;
     }
 
     if (inst.streaming) {
-      await tgCtx.reply("⏳ 等当前任务完成");
+      await tgCtx.reply("⏳ Wait for current task to finish");
       return;
     }
 
     try {
       const lastText = await inst.getLastAssistantText();
       if (!lastText) {
-        await tgCtx.reply("没有可撤回的回复");
+        await tgCtx.reply("No replies to undo");
         return;
       }
 
       const preview = truncate(lastText, 120);
-      await tgCtx.reply(`撤回："${preview}..."\n请输入新的指令或修正。`);
+      await tgCtx.reply(`Undoed: "${preview}..."\nSend new instructions or corrections.`);
       rememberReplyMessage(replyScopeKey(tgCtx), "self", tgCtx.message!.message_id, lastText);
     } catch (err) {
-      await tgCtx.reply(`❌ 获取失败：${truncate((err as Error).message, 500)}`);
+      await tgCtx.reply(`❌ Fetch failed: ${truncate((err as Error).message, 500)}`);
     }
   });
 
-  commandGroup.command("autocompact", "自动压缩开关", async (tgCtx) => {
+  commandGroup.command("autocompact", "Toggle auto-compaction", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
 
     if (!inst?.alive) {
-      await tgCtx.reply("会话未启动");
+      await tgCtx.reply("Session not started");
       return;
     }
 
@@ -516,41 +516,41 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
     if (arg === "on" || arg === "1" || arg === "true") {
       await inst.setAutoCompaction(true);
-      await tgCtx.reply("✅ 自动压缩已开启");
+      await tgCtx.reply("✅ Auto-compaction enabled");
     } else if (arg === "off" || arg === "0" || arg === "false") {
       await inst.setAutoCompaction(false);
-      await tgCtx.reply("⚪ 自动压缩已关闭");
+      await tgCtx.reply("⚪ Auto-compaction disabled");
     } else {
-      await tgCtx.reply("用法：/autocompact on|off");
+      await tgCtx.reply("Usage: /autocompact on|off");
     }
   });
 
-  commandGroup.command("model", "切换模型", async (tgCtx) => {
+  commandGroup.command("model", "Switch model", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
 
     try {
       await menus.refreshModelsForChat(chatId);
     } catch (err) {
-      await tgCtx.reply(`❌ 获取模型列表失败：${(err as Error).message}`);
+      await tgCtx.reply(`❌ Failed to get model list: ${(err as Error).message}`);
       return;
     }
 
-    await tgCtx.reply("🔄 选择 Provider:", { reply_markup: modelMenu });
+    await tgCtx.reply("🔄 Select Provider:", { reply_markup: modelMenu });
   });
 
-  commandGroup.command("stream", "切换流式输出", async (tgCtx) => {
-    await tgCtx.reply("⚙️ 输出模式:", { reply_markup: streamMenu });
+  commandGroup.command("stream", "Toggle streaming output", async (tgCtx) => {
+    await tgCtx.reply("⚙️ Output mode:", { reply_markup: streamMenu });
   });
 
-  commandGroup.command("thinking", "切换思考程度", async (tgCtx) => {
+  commandGroup.command("thinking", "Switch thinking level", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const supported = await menus.supportsThinkingForChat(chatId);
     if (!supported) {
-      await tgCtx.reply("当前模型不支持思考等级");
+      await tgCtx.reply("Current model does not support thinking levels");
       return;
     }
     await menus.ensureThinkingForChat(chatId);
-    await tgCtx.reply("🧠 思考程度:", { reply_markup: thinkingMenu });
+    await tgCtx.reply("🧠 Thinking level:", { reply_markup: thinkingMenu });
   });
 
   let cronScopeBotId: number | null = null;
@@ -607,8 +607,8 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
     if (prepared.warnings.length) {
       const preview = prepared.warnings.slice(0, 3).join("\n");
-      const more = prepared.warnings.length > 3 ? `\n... 还有 ${prepared.warnings.length - 3} 条` : "";
-      await bot.api.sendMessage(chatId, `⚠️ 附件解析告警：\n${preview}${more}`).catch(() => {});
+      const more = prepared.warnings.length > 3 ? `\n... and ${prepared.warnings.length - 3} items in queue` : "";
+      await bot.api.sendMessage(chatId, `⚠️ Attachment parse warnings: \n${preview}${more}`).catch(() => {});
     }
 
     if (prepared.body.trim()) {
@@ -618,7 +618,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           const sent = await bot.api.sendMessage(chatId, html, { parse_mode: "HTML" });
           rememberReplyMessage(scope, "self", sent.message_id, part);
         } catch (err) {
-          log.warn(`chat${chatId} 定时任务 HTML 发送失败，降级纯文本：${describeTelegramSendError(err)}`);
+          log.warn(`chat${chatId} Cron task HTML send failed, falling back to plain text: ${describeTelegramSendError(err)}`);
           const plain = mdToPlainText(stripProtocolTags(part));
           const sent = await bot.api.sendMessage(chatId, plain);
           rememberReplyMessage(scope, "self", sent.message_id, plain);
@@ -630,7 +630,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       try {
         await sendCronAttachment(chatId, att);
       } catch (err) {
-        await bot.api.sendMessage(chatId, `❌ 附件发送失败：${att.label || "未知附件"}\n${(err as Error).message}`).catch(() => {});
+        await bot.api.sendMessage(chatId, `❌ Attachment send failed: ${att.label || "Unknown attachment"}\n${(err as Error).message}`).catch(() => {});
       }
     }
   };
@@ -647,7 +647,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       const message = err instanceof Error ? err.message : String(err);
       await bot.api.sendMessage(
         job.chatId,
-        `❌ 定时任务「${job.name || job.id}」执行失败：${truncate(message, 1500)}`,
+        `❌ Cron task "${job.name || job.id}" execution failed: ${truncate(message, 1500)}`,
       ).catch(() => {});
       return { ok: false, error: message };
     }
@@ -665,9 +665,9 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
   const buildCronMenuTitle = (chatId: number): string => {
     const pending = cronPendingInput.get(chatId);
     const hint = pending
-      ? `\n当前等待输入：${pending.kind}（请直接发送文本，或在菜单中取消）`
+      ? `\nAwaiting input: ${pending.kind} (send text directly, or cancel in menu)`
       : "";
-    return `⏰ 定时任务菜单${hint}`;
+    return `⏰ Cron task menu${hint}`;
   };
 
   const setCronMenuPage = (chatId: number, page: number, totalPages: number): number => {
@@ -691,7 +691,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       } catch (err) {
         if (isMessageNotModifiedError(err)) return;
         cronMenuMessageByChat.delete(chatId);
-        log.warn(`chat${chatId} 更新 /cron 菜单失败，将尝试重新发送：${describeTelegramSendError(err)}`);
+        log.warn(`chat${chatId} Failed to update /cron menu, will try resending: ${describeTelegramSendError(err)}`);
       }
     }
 
@@ -700,7 +700,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
   };
 
   const cronMenu = new Menu<BotContext>(cronRootMenuId, {
-    onMenuOutdated: "菜单已更新，请重试",
+    onMenuOutdated: "Menu updated, please retry",
     fingerprint: (ctx) => {
       const chatId = ctx.chat?.id ?? 0;
       const st = cron.status(chatId);
@@ -737,52 +737,52 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     const pageJobs = jobs.slice(start, start + CRON_MENU_PAGE_SIZE);
 
     range.text(
-      `📊 ${st.enabled ? "开启" : "关闭"} | 任务 ${st.totalJobs} | 运行 ${st.runningJobs} | 队列 ${st.queuedJobs}`,
-      (ctx) => ctx.answerCallbackQuery({ text: "状态已更新" }),
+      `📊 ${st.enabled ? "On" : "Off"} | Tasks ${st.totalJobs} | Running ${st.runningJobs} | Queued ${st.queuedJobs}`,
+      (ctx) => ctx.answerCallbackQuery({ text: "Status updated" }),
     ).row();
 
-    range.text("🔄 刷新", async (ctx) => {
+    range.text("🔄 Refresh", async (ctx) => {
       try { ctx.menu.update(); } catch { /* ignore */ }
-      await ctx.answerCallbackQuery({ text: "已刷新" });
+      await ctx.answerCallbackQuery({ text: "Refreshed" });
     });
 
-    range.text("➕ 一次性", async (ctx) => {
+    range.text("➕ One-time", async (ctx) => {
       cronPendingInput.set(chatId, { kind: "at", startedAt: Date.now() });
-      await ctx.answerCallbackQuery({ text: "请发送: <ISO时间> <内容>" });
-      await ctx.reply("🕒 请输入一次性任务：\n<ISO时间> <内容>\n可选名称：<ISO时间> <名称||内容>\n例如：2026-03-01T09:00:00+08:00 早报总结");
+      await ctx.answerCallbackQuery({ text: "Send: <ISO time> <content>" });
+      await ctx.reply("🕒 Enter one-time task: \n<ISO time> <content>\nWith name: <ISO time> <name||content>\nExample: 2026-03-01T09:00:00+08:00 Morning briefing");
       try { ctx.menu.update(); } catch { /* ignore */ }
     }).row();
 
-    range.text("➕ 间隔", async (ctx) => {
+    range.text("➕ Interval", async (ctx) => {
       cronPendingInput.set(chatId, { kind: "every", startedAt: Date.now() });
-      await ctx.answerCallbackQuery({ text: "请发送: <间隔> <内容>" });
-      await ctx.reply("⏱ 请输入间隔任务：\n<间隔> <内容>\n可选名称：<间隔> <名称||内容>\n例如：10m 检查报警\n支持：s/m/h/d");
+      await ctx.answerCallbackQuery({ text: "Send: <interval> <content>" });
+      await ctx.reply("⏱ Enter interval task: \n<interval> <content>\nWith name: <interval> <name||content>\nExample: 10m Check alerts\nSupported: s/m/h/d");
       try { ctx.menu.update(); } catch { /* ignore */ }
     });
 
     range.text("➕ Cron", async (ctx) => {
       cronPendingInput.set(chatId, { kind: "cron", startedAt: Date.now() });
-      await ctx.answerCallbackQuery({ text: "请发送: <表达式> | [时区] | [名称] | <内容>" });
-      await ctx.reply("🧩 请输入 Cron 任务：\n<表达式> | [时区] | [名称] | <内容>\n例如：0 9 * * 1-5 | Asia/Shanghai | 工作日早报 | 汇总日报");
+      await ctx.answerCallbackQuery({ text: "Send: <expression> | [timezone] | [name] | <content>" });
+      await ctx.reply("🧩 Enter Cron task: \n<expression> | [timezone] | [name] | <content>\nExample: 0 9 * * 1-5 | Asia/Shanghai | Weekday briefing | Daily summary");
       try { ctx.menu.update(); } catch { /* ignore */ }
     }).row();
 
     if (pending) {
       const ageSec = Math.max(0, Math.floor((Date.now() - pending.startedAt) / 1000));
-      range.text(`❌ 取消输入（${pending.kind}, ${ageSec}s）`, async (ctx) => {
+      range.text(`❌ Cancel input (${pending.kind}, ${ageSec}s)`, async (ctx) => {
         cronPendingInput.delete(chatId);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: "已取消" });
+        await ctx.answerCallbackQuery({ text: "Cancelled" });
       }).row();
     }
 
     if (!jobs.length) {
-      range.text("当前无任务", (ctx) => ctx.answerCallbackQuery({ text: "暂无任务" }));
+      range.text("No tasks", (ctx) => ctx.answerCallbackQuery({ text: "No tasks yet" }));
       return;
     }
 
-    range.text(`📄 第 ${page + 1}/${totalPages} 页`, (ctx) =>
-      ctx.answerCallbackQuery({ text: `本页 ${pageJobs.length} 条` }),
+    range.text(`📄 Page ${page + 1}/${totalPages}`, (ctx) =>
+      ctx.answerCallbackQuery({ text: `${pageJobs.length} items in queue` }),
     ).row();
 
     for (const job of pageJobs) {
@@ -792,45 +792,45 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         ctx.answerCallbackQuery({ text: `${formatCronSchedule(job.schedule)} | next=${formatDateTime(job.state.nextRunAtMs)}`.slice(0, 190) }),
       ).row();
 
-      range.text(job.enabled ? "⏸ 停用" : "▶️ 启用", async (ctx) => {
+      range.text(job.enabled ? "⏸ Disable" : "▶️ Enable", async (ctx) => {
         await cron.setEnabled(job.id, !job.enabled);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: job.enabled ? "已停用" : "已启用" });
+        await ctx.answerCallbackQuery({ text: job.enabled ? "Disabled" : "Enabled" });
       });
 
-      range.text("▶️ 执行", async (ctx) => {
+      range.text("▶️ Run", async (ctx) => {
         const ok = await cron.runNow(job.id);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: ok ? "已加入执行队列" : "加入失败" });
+        await ctx.answerCallbackQuery({ text: ok ? "Added to execution queue" : "Failed to add" });
       });
 
-      range.text("✏️ 改名", async (ctx) => {
+      range.text("✏️ Rename", async (ctx) => {
         cronPendingInput.set(chatId, { kind: "rename", jobId: job.id, startedAt: Date.now() });
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: "请发送新名称" });
-        await ctx.reply(`✏️ 请发送任务 ${job.id} 的新名称`);
+        await ctx.answerCallbackQuery({ text: "Send new name" });
+        await ctx.reply(`✏️ Send new name for task ${job.id}`);
       }).row();
 
-      range.text("🗑 删除", async (ctx) => {
+      range.text("🗑 Delete", async (ctx) => {
         await cron.remove(job.id);
         const nextTotalPages = Math.max(1, Math.ceil(Math.max(0, jobs.length - 1) / CRON_MENU_PAGE_SIZE));
         setCronMenuPage(chatId, page, nextTotalPages);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: "已删除" });
+        await ctx.answerCallbackQuery({ text: "Deleted" });
       }).row();
     }
 
     if (totalPages > 1) {
-      range.text("⬅️ 上一页", async (ctx) => {
+      range.text("⬅️ Prev", async (ctx) => {
         setCronMenuPage(chatId, page - 1, totalPages);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: `第 ${Math.max(1, page)} 页` });
+        await ctx.answerCallbackQuery({ text: `Page ${Math.max(1, page)}` });
       });
 
-      range.text("➡️ 下一页", async (ctx) => {
+      range.text("➡️ Next", async (ctx) => {
         setCronMenuPage(chatId, page + 1, totalPages);
         try { ctx.menu.update(); } catch { /* ignore */ }
-        await ctx.answerCallbackQuery({ text: `第 ${Math.min(totalPages, page + 2)} 页` });
+        await ctx.answerCallbackQuery({ text: `Page ${Math.min(totalPages, page + 2)}` });
       }).row();
     }
   });
@@ -841,7 +841,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     await cronMenu.middleware()(tgCtx, async () => {});
   };
 
-  commandGroup.command("cron", "管理定时任务", async (tgCtx) => {
+  commandGroup.command("cron", "Manage cron tasks", async (tgCtx) => {
     try {
       const raw = extractCommandArgs(String((tgCtx.message as any)?.text || ""), "cron");
       const chatId = tgCtx.chat.id;
@@ -862,12 +862,12 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     if (sub === "list" || sub === "ls") {
       const jobs = cron.list(chatId);
       if (!jobs.length) {
-        await tgCtx.reply("当前聊天暂无定时任务。使用 /cron add ... 创建。");
+        await tgCtx.reply("No cron tasks in this chat. Use /cron add ... to create one.");
         return;
       }
 
       const lines = jobs.map((job) => formatCronJobLine(job));
-      const text = `⏰ 定时任务（${jobs.length}）\n${lines.join("\n")}`;
+      const text = `⏰ Cron tasks (${jobs.length})\n${lines.join("\n")}`;
       for (const part of splitMessage(text, maxResponseLength)) {
         await tgCtx.reply(part);
       }
@@ -883,7 +883,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     if (sub === "add") {
       const kind = (args.shift() || "").toLowerCase();
       if (!kind) {
-        await tgCtx.reply("用法：/cron add at|every|cron ...");
+        await tgCtx.reply("Usage: /cron add at|every|cron ...");
         return;
       }
 
@@ -892,13 +892,13 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const named = parseNamedPrompt(args.join(" "));
         const prompt = named.prompt;
         if (!atRaw || !prompt) {
-          await tgCtx.reply("用法：/cron add at <ISO时间> <内容>");
+          await tgCtx.reply("Usage: /cron add at <ISO time> <content>");
           return;
         }
 
         const atMs = new Date(atRaw).getTime();
         if (!Number.isFinite(atMs)) {
-          await tgCtx.reply("时间格式非法，请使用 ISO 8601，例如 2026-03-01T09:00:00+08:00");
+          await tgCtx.reply("Invalid time format, use ISO 8601, e.g. 2026-03-01T09:00:00+08:00");
           return;
         }
 
@@ -908,7 +908,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           prompt,
           schedule: { kind: "at", atMs },
         });
-        await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+        await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
         return;
       }
 
@@ -918,7 +918,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const prompt = named.prompt;
         const everyMs = parseDurationMs(everyRaw);
         if (!everyMs || !prompt) {
-          await tgCtx.reply("用法：/cron add every <间隔> <内容>\n示例：/cron add every 10m 早报总结");
+          await tgCtx.reply("Usage: /cron add every <interval> <content>\nExample: /cron add every 10m Morning briefing");
           return;
         }
 
@@ -928,14 +928,14 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           prompt,
           schedule: { kind: "every", everyMs, anchorMs: Date.now() },
         });
-        await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+        await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
         return;
       }
 
       if (kind === "cron") {
         const expr = args.shift() || "";
         if (!expr) {
-          await tgCtx.reply("用法：/cron add cron \"<表达式>\" [时区] <内容>");
+          await tgCtx.reply("Usage: /cron add cron \"<expression>\" [timezone] <content>");
           return;
         }
 
@@ -947,7 +947,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const named = parseNamedPrompt(args.join(" "));
         const prompt = named.prompt;
         if (!prompt) {
-          await tgCtx.reply("用法：/cron add cron \"<表达式>\" [时区] <内容>");
+          await tgCtx.reply("Usage: /cron add cron \"<expression>\" [timezone] <content>");
           return;
         }
 
@@ -958,42 +958,42 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           schedule: { kind: "cron", expr, timezone },
         });
 
-        await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+        await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
         return;
       }
 
-      await tgCtx.reply("不支持的类型，仅支持 at / every / cron");
+      await tgCtx.reply("Unsupported type, only at / every / cron");
       return;
     }
 
     if (sub === "on" || sub === "off") {
       const id = (args.shift() || "").trim();
       if (!id) {
-        await tgCtx.reply("用法：/cron on <id> 或 /cron off <id>");
+        await tgCtx.reply("Usage: /cron on <id> or /cron off <id>");
         return;
       }
       const updated = await cron.setEnabled(id, sub === "on");
       if (!updated || updated.chatId !== chatId) {
-        await tgCtx.reply("未找到该任务（或不属于当前聊天）");
+        await tgCtx.reply("Job not found (or not in this chat)");
         return;
       }
-      await tgCtx.reply(`✅ 任务 ${id} 已${sub === "on" ? "启用" : "停用"}`);
+      await tgCtx.reply(`✅ Task ${id} ${sub === "on" ? "enabled" : "disabled"}`);
       return;
     }
 
     if (sub === "del" || sub === "rm" || sub === "remove") {
       const id = (args.shift() || "").trim();
       if (!id) {
-        await tgCtx.reply("用法：/cron del <id>");
+        await tgCtx.reply("Usage: /cron del <id>");
         return;
       }
       const job = cron.get(id);
       if (!job || job.chatId !== chatId) {
-        await tgCtx.reply("未找到该任务（或不属于当前聊天）");
+        await tgCtx.reply("Job not found (or not in this chat)");
         return;
       }
       await cron.remove(id);
-      await tgCtx.reply(`🗑 已删除任务 ${id}`);
+      await tgCtx.reply(`🗑 Deleted task ${id}`);
       return;
     }
 
@@ -1001,45 +1001,45 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       const id = (args.shift() || "").trim();
       const newName = args.join(" ").trim();
       if (!id || !newName) {
-        await tgCtx.reply("用法：/cron rename <id> <新名称>");
+        await tgCtx.reply("Usage: /cron rename <id> <new name>");
         return;
       }
       const job = cron.get(id);
       if (!job || job.chatId !== chatId) {
-        await tgCtx.reply("未找到该任务（或不属于当前聊天）");
+        await tgCtx.reply("Job not found (or not in this chat)");
         return;
       }
       const updated = await cron.rename(id, newName);
       if (!updated) {
-        await tgCtx.reply("重命名失败");
+        await tgCtx.reply("Rename failed");
         return;
       }
-      await tgCtx.reply(`✏️ 任务 ${id} 已重命名为：${updated.name}`);
+      await tgCtx.reply(`✏️ Task ${id} renamed to: ${updated.name}`);
       return;
     }
 
     if (sub === "run") {
       const id = (args.shift() || "").trim();
       if (!id) {
-        await tgCtx.reply("用法：/cron run <id>");
+        await tgCtx.reply("Usage: /cron run <id>");
         return;
       }
       const job = cron.get(id);
       if (!job || job.chatId !== chatId) {
-        await tgCtx.reply("未找到该任务（或不属于当前聊天）");
+        await tgCtx.reply("Job not found (or not in this chat)");
         return;
       }
       const ok = await cron.runNow(id);
-      await tgCtx.reply(ok ? `▶️ 任务 ${id} 已加入执行队列` : "加入队列失败");
+      await tgCtx.reply(ok ? `▶️ Task ${id} added to queue` : "Failed to add to queue");
       return;
     }
 
-      await tgCtx.reply("未知子命令。发送 /cron help 查看用法。");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await tgCtx.reply(`❌ cron 操作失败：${truncate(message, 1000)}`).catch(() => {});
-    }
-  });
+    await tgCtx.reply("Unknown subcommand. Send /cron help for usage.");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await tgCtx.reply(`❌ Cron operation failed: ${truncate(message, 1000)}`).catch(() => {});
+  }
+});
 
   type PromptPayload = { message: string; images?: PiImage[] };
   type PromptBuildOptions = { supportsImages: boolean };
@@ -1129,7 +1129,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     const ensureOwned = (id: string): CronJobRecord => {
       const job = cron.get(id);
       if (!job || job.chatId !== chatId) {
-        throw new Error("未找到该任务（或不属于当前聊天）");
+        throw new Error("Job not found (or not in this chat)");
       }
       return job;
     };
@@ -1138,10 +1138,10 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       case "list": {
         const jobs = cron.list(chatId);
         if (!jobs.length) {
-          notices.push("⏰ 当前聊天暂无定时任务。");
+          notices.push("⏰ No cron tasks in this chat.");
           break;
         }
-        notices.push(`⏰ 定时任务（${jobs.length}）\n${jobs.map((x) => formatCronJobLine(x)).join("\n")}`);
+        notices.push(`⏰ Cron tasks (${jobs.length})\n${jobs.map((x) => formatCronJobLine(x)).join("\n")}`);
         break;
       }
 
@@ -1152,10 +1152,10 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
       case "add": {
         const prompt = String(directive.prompt || "").trim();
-        if (!prompt) throw new Error("add 缺少任务内容");
+        if (!prompt) throw new Error("add missing task content");
 
         const kind = directive.kind;
-        if (!kind) throw new Error("add 缺少 kind");
+        if (!kind) throw new Error("add missing kind");
 
         let schedule: CronSchedule;
 
@@ -1163,23 +1163,23 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           const atRaw = String(directive.at || "").trim();
           const atMs = new Date(atRaw).getTime();
           if (!Number.isFinite(atMs)) {
-            throw new Error("add kind=at 的 at 时间非法（需 ISO 时间）");
+            throw new Error("add kind=at: invalid at time (ISO time required)");
           }
           schedule = { kind: "at", atMs };
         } else if (kind === "every") {
           const everyMs = parseDurationMs(String(directive.every || "").trim());
           if (!everyMs) {
-            throw new Error("add kind=every 的 every 非法（如 10m/2h/1d）");
+            throw new Error("add kind=every: invalid every value (e.g. 10m/2h/1d)");
           }
           schedule = { kind: "every", everyMs, anchorMs: Date.now() };
         } else {
           const expr = String(directive.expr || "").trim();
-          if (!expr) throw new Error("add kind=cron 缺少 expr");
+          if (!expr) throw new Error("add kind=cron missing expr");
 
           const tzRaw = String(directive.timezone || "").trim();
           const timezone = tzRaw || cron.getDefaultTimezone();
           if (!looksLikeTimezone(timezone)) {
-            throw new Error(`timezone 非法：${timezone}`);
+            throw new Error(`Invalid timezone: ${timezone}`);
           }
           schedule = { kind: "cron", expr, timezone };
         }
@@ -1191,63 +1191,63 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           schedule,
         });
 
-        notices.push(`✅ 已创建任务 ${created.id}\n${formatCronSchedule(created.schedule)}\n名称：${created.name}`);
+        notices.push(`✅ Task created ${created.id}\n${formatCronSchedule(created.schedule)}\nName: ${created.name}`);
         break;
       }
 
       case "on": {
         const id = String(directive.id || "").trim();
-        if (!id) throw new Error("on 缺少 id");
+        if (!id) throw new Error("on missing id");
         ensureOwned(id);
         await cron.setEnabled(id, true);
-        notices.push(`✅ 任务 ${id} 已启用`);
+        notices.push(`✅ Task ${id} enabled`);
         break;
       }
 
       case "off": {
         const id = String(directive.id || "").trim();
-        if (!id) throw new Error("off 缺少 id");
+        if (!id) throw new Error("off missing id");
         ensureOwned(id);
         await cron.setEnabled(id, false);
-        notices.push(`✅ 任务 ${id} 已停用`);
+        notices.push(`✅ Task ${id} disabled`);
         break;
       }
 
       case "del": {
         const id = String(directive.id || "").trim();
-        if (!id) throw new Error("del 缺少 id");
+        if (!id) throw new Error("del missing id");
         ensureOwned(id);
         await cron.remove(id);
-        notices.push(`🗑 已删除任务 ${id}`);
+        notices.push(`🗑 Deleted task ${id}`);
         break;
       }
 
       case "rename": {
         const id = String(directive.id || "").trim();
-        if (!id) throw new Error("rename 缺少 id");
+        if (!id) throw new Error("rename missing id");
         ensureOwned(id);
 
         const newName = String(directive.name || "").trim();
-        if (!newName) throw new Error("rename 缺少 name");
+        if (!newName) throw new Error("rename missing name");
 
         const updated = await cron.rename(id, newName);
-        if (!updated) throw new Error("rename 失败");
+        if (!updated) throw new Error("Rename failed");
 
-        notices.push(`✏️ 任务 ${id} 已重命名为：${updated.name}`);
+        notices.push(`✏️ Task ${id} renamed to: ${updated.name}`);
         break;
       }
 
       case "run": {
         const id = String(directive.id || "").trim();
-        if (!id) throw new Error("run 缺少 id");
+        if (!id) throw new Error("run missing id");
         ensureOwned(id);
         const ok = await cron.runNow(id);
-        notices.push(ok ? `▶️ 任务 ${id} 已加入执行队列` : `❌ 任务 ${id} 加入队列失败`);
+        notices.push(ok ? `▶️ Task ${id} added to queue` : `❌ Task ${id} failed to add to queue`);
         break;
       }
 
       default:
-        warnings.push(`不支持的 tg-cron action: ${(directive as any).action}`);
+        warnings.push(`Unsupported tg-cron action: ${(directive as any).action}`);
         break;
     }
 
@@ -1270,7 +1270,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         warnings.push(...res.warnings);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        warnings.push(`tg-cron(${directive.action}) 执行失败：${message}`);
+        warnings.push(`tg-cron(${directive.action}) execution failed: ${message}`);
       }
     }
 
@@ -1292,7 +1292,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const job = cron.get(pending.jobId);
         if (!job || job.chatId !== chatId) {
           cronPendingInput.delete(chatId);
-          await tgCtx.reply("❌ 目标任务不存在或不属于当前聊天");
+          await tgCtx.reply("❌ Target task not found or not in this chat");
           return true;
         }
 
@@ -1300,18 +1300,18 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         cronPendingInput.delete(chatId);
         await upsertCronMenuMessage(tgCtx);
         if (!updated) {
-          await tgCtx.reply("❌ 重命名失败");
+          await tgCtx.reply("❌ Rename failed");
           return true;
         }
 
-        await tgCtx.reply(`✏️ 任务 ${updated.id} 已重命名为：${updated.name}`);
+        await tgCtx.reply(`✏️ Task ${updated.id} renamed to: ${updated.name}`);
         return true;
       }
 
       if (pending.kind === "at") {
         const firstSpace = raw.indexOf(" ");
         if (firstSpace < 0) {
-          await tgCtx.reply("❌ 格式不对，请发送：<ISO时间> <内容>");
+          await tgCtx.reply("❌ Invalid format, send: <ISO time> <content>");
           return true;
         }
 
@@ -1321,7 +1321,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const atMs = new Date(atRaw).getTime();
 
         if (!Number.isFinite(atMs) || !prompt) {
-          await tgCtx.reply("❌ 格式不对，请发送：<ISO时间> <内容>");
+          await tgCtx.reply("❌ Invalid format, send: <ISO time> <content>");
           return true;
         }
 
@@ -1334,14 +1334,14 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
         cronPendingInput.delete(chatId);
         await upsertCronMenuMessage(tgCtx);
-        await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+        await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
         return true;
       }
 
       if (pending.kind === "every") {
         const firstSpace = raw.indexOf(" ");
         if (firstSpace < 0) {
-          await tgCtx.reply("❌ 格式不对，请发送：<间隔> <内容>，例如：10m 检查报警");
+          await tgCtx.reply("❌ Invalid format. Usage: <interval> <content>, Example: 10m Check alerts");
           return true;
         }
 
@@ -1351,7 +1351,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
         const everyMs = parseDurationMs(everyRaw);
 
         if (!everyMs || !prompt) {
-          await tgCtx.reply("❌ 间隔格式非法，支持：s/m/h/d（如 30s、10m、2h、1d）");
+          await tgCtx.reply("❌ Invalid interval format. Supported: s/m/h/d (e.g. 30s, 10m, 2h, 1d)");
           return true;
         }
 
@@ -1364,14 +1364,14 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
         cronPendingInput.delete(chatId);
         await upsertCronMenuMessage(tgCtx);
-        await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+        await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
         return true;
       }
 
       // pending.kind === "cron"
       const parts = raw.split("|").map((x) => x.trim()).filter(Boolean);
       if (parts.length < 2) {
-        await tgCtx.reply("❌ 格式不对，请发送：<表达式> | [时区] | [名称] | <内容>");
+        await tgCtx.reply("❌ Invalid format. Usage: <expression> | [timezone] | [name] | <content>");
         return true;
       }
 
@@ -1396,12 +1396,12 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       }
 
       if (!prompt) {
-        await tgCtx.reply("❌ 缺少任务内容，请发送：<表达式> | [时区] | [名称] | <内容>");
+        await tgCtx.reply("❌ Missing task content. Usage: <expression> | [timezone] | [name] | <content>");
         return true;
       }
 
       if (!looksLikeTimezone(timezone)) {
-        await tgCtx.reply(`❌ 时区格式非法：${timezone}`);
+        await tgCtx.reply(`❌ Invalid timezone format: ${timezone}`);
         return true;
       }
 
@@ -1414,11 +1414,11 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
       cronPendingInput.delete(chatId);
       await upsertCronMenuMessage(tgCtx);
-      await tgCtx.reply(`✅ 已创建任务 ${job.id}\n${formatCronSchedule(job.schedule)}\n名称：${job.name}`);
+      await tgCtx.reply(`✅ Task created ${job.id}\n${formatCronSchedule(job.schedule)}\nName: ${job.name}`);
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await tgCtx.reply(`❌ 创建任务失败：${truncate(message, 800)}\n可继续输入，或打开 /cron 菜单取消`).catch(() => {});
+      await tgCtx.reply(`❌ Task creation failed: ${truncate(message, 800)}\nYou can continue typing, or cancel in /cron menu`).catch(() => {});
       return true;
     }
   };
@@ -1434,8 +1434,8 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     const useDraftStream = useStream && shouldUseDraftStreaming(tgCtx);
 
     const initialStatus = ahead > 0
-      ? `⏳ 排队中（前方 ${ahead} 条）...`
-      : "⏳ 思考中...";
+      ? `⏳ Queued (${ahead} items in queue)...`
+      : "⏳ Thinking...";
     const status = !useStream
       ? await tgCtx.reply(initialStatus)
       : null;
@@ -1447,7 +1447,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     const onStart = () => {
       promptTracker.onStart();
       if (!status || ahead <= 0) return;
-      void status.editText("⏳ 思考中...").catch(() => {});
+      void status.editText("⏳ Thinking...").catch(() => {});
     };
 
     try {
@@ -1464,7 +1464,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
             getMessageThreadId(tgCtx),
             maxResponseLength,
             (err) => {
-              log.warn(`chat${chatId} sendMessageDraft 预览失败，已降级跳过：${describeTelegramSendError(err)}`);
+              log.warn(`chat${chatId} sendMessageDraft preview failed, skipping: ${describeTelegramSendError(err)}`);
             },
           )
           : createSilentStreamUpdater();
@@ -1520,17 +1520,17 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           }
 
           if (abortDirective.showAbortNotice) {
-            await tgCtx.reply("🛑 已中止").catch(() => {});
+            await tgCtx.reply("🛑 Aborted").catch(() => {});
           }
         } else if (consumeAbortNoticeSuppression(chatId)) {
           await status?.delete().catch(() => {});
         } else if (status) {
-          await reportStatusOrReply(tgCtx, status, "🛑 已中止");
+          await reportStatusOrReply(tgCtx, status, "🛑 Aborted");
         } else {
-          await tgCtx.reply("🛑 已中止").catch(() => {});
+          await tgCtx.reply("🛑 Aborted").catch(() => {});
         }
       } else if (useStream && streamedText.trim()) {
-        const errLine = `⚠️ 生成中断：${truncate(message, 300)}`;
+        const errLine = `⚠️ Generation interrupted: ${truncate(message, 300)}`;
         const merged = truncate(`${streamedText}\n\n${errLine}`, maxResponseLength);
         if (status) {
           await reportStatusOrReply(tgCtx, status, merged);
@@ -1538,7 +1538,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           await tgCtx.reply(merged).catch(() => {});
         }
       } else {
-        const errorText = `❌ 错误：${message}`;
+        const errorText = `❌ Error: ${message}`;
         if (status) {
           await reportStatusOrReply(tgCtx, status, errorText);
         } else {
@@ -1570,20 +1570,20 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
       if (Number.isFinite(num) && num >= 1 && num <= forkMessages.length) {
         const selected = forkMessages[num - 1];
         pendingForkMessages.delete(tgCtx.chat.id);
-        const status = await tgCtx.reply(`⏳ 正在从消息 ${num} 分叉...`);
+        const status = await tgCtx.reply(`⏳ Forking from message ${num}...`);
         try {
           const key = chatKey(botKey, tgCtx.chat.id);
           const inst = pool.get(key);
           const result = await inst.fork(selected.entryId);
           await status.delete().catch(() => {});
           if (result.cancelled) {
-            await tgCtx.reply("⚠️ 分叉被扩展取消");
+            await tgCtx.reply("⚠️ Fork cancelled by extension");
             return;
           }
-          await tgCtx.reply(`✅ 已从消息 ${num} 分叉\n${truncate(result.text, 100)}`);
+          await tgCtx.reply(`✅ Forked from message ${num}\n${truncate(result.text, 100)}`);
         } catch (err) {
           await status.delete().catch(() => {});
-          await tgCtx.reply(`❌ 分叉失败：${truncate((err as Error).message, 500)}`);
+          await tgCtx.reply(`❌ Fork failed: ${truncate((err as Error).message, 500)}`);
         }
         return;
       }
@@ -1604,7 +1604,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
   // Photos
   bot.on("message:photo", async (tgCtx) => {
-    const caption = tgCtx.message.caption || "请描述这张图片";
+    const caption = tgCtx.message.caption || "Please describe this image";
     rememberReplyMessage(replyScopeKey(tgCtx), "user", tgCtx.message.message_id, caption);
     rememberReferencedReply(tgCtx);
 
@@ -1636,7 +1636,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
   // Generic files (documents)
   bot.on("message:document", async (tgCtx) => {
     const document = tgCtx.message.document;
-    const baseText = tgCtx.message.caption || document.file_name || "请处理这个文件";
+    const baseText = tgCtx.message.caption || document.file_name || "Please process this file";
     rememberReplyMessage(replyScopeKey(tgCtx), "user", tgCtx.message.message_id, baseText);
     rememberReferencedReply(tgCtx);
 
@@ -1765,7 +1765,7 @@ function buildUserMessageWithReplyContext(
   if (!hasUsefulReply) return content;
 
   const replyBlock = [
-    "[回复上下文开始]",
+    "[Reply context start]",
     targetFrom ? `reply_to_sender: ${targetFrom}` : "",
     targetText ? `reply_to_text: ${truncate(targetText, 1200)}` : "",
     quote ? `user_selected_quote: ${truncate(quote, 500)}` : "",
@@ -1779,15 +1779,15 @@ function buildUserMessageWithReplyContext(
       ? `current_file_paths:\n- ${currentFilePaths.join("\n- ")}`
       : "",
     referencedImagePaths.length > 0 || currentImagePaths.length > 0
-      ? "附图顺序：先 current_images（如果有），再 reply_to_images。"
+      ? "Attachment order: current_images first (if any), then reply_to_images."
       : "",
-    "[回复上下文结束]",
+    "[Reply context end]",
   ].filter(Boolean);
 
   return [
     ...replyBlock,
     "",
-    "[用户真实请求]",
+    "[User's actual request]",
     content,
   ].join("\n");
 }
@@ -2024,7 +2024,7 @@ async function maybeWarnContextFull(tgCtx: BotContext, inst: ReturnType<PiPool["
     const pct = usage.percent.toFixed(0);
     const used = typeof usage.tokens === "number" ? usage.tokens : "?";
     const total = typeof usage.contextWindow === "number" ? usage.contextWindow : "?";
-    await tgCtx.reply(`⚠️ 上下文已用 ${pct}%（${used}/${total}），建议 /compact 压缩`).catch(() => {});
+    await tgCtx.reply(`⚠️ Context ${pct}% used (${used}/${total}), consider /compact`).catch(() => {});
   } catch {
     /* best-effort */
   }
@@ -2205,7 +2205,7 @@ export function createDraftPreviewModel(maxLen: number): DraftPreviewModel {
       if (tools.length > 0) {
         tools[tools.length - 1] = `${tools[tools.length - 1]} ❌`;
       } else {
-        tools.push("🔧 执行失败 ❌");
+        tools.push("🔧 Execution failed ❌");
       }
       toolBlock = tools.length ? `${tools.join("\n")}\n\n` : "";
     },
@@ -2225,7 +2225,7 @@ export function createDraftPreviewModel(maxLen: number): DraftPreviewModel {
       const getPlainText = () => {
         if (plainText !== undefined) return plainText;
         plainText = mdToPlainText(preview).trim();
-        if (!plainText || plainText === "(无回复)") {
+        if (!plainText || plainText === "(no reply)") {
           plainText = "";
           return plainText;
         }
@@ -2237,7 +2237,7 @@ export function createDraftPreviewModel(maxLen: number): DraftPreviewModel {
 
       if (draftSupportsHtml) {
         const htmlDraftText = mdToTgHtml(preview).trim();
-        if (htmlDraftText && htmlDraftText !== "(无回复)") {
+        if (htmlDraftText && htmlDraftText !== "(no reply)") {
           lastPreview = preview;
           lastDraftSupportsHtml = draftSupportsHtml;
           lastResult = {
@@ -2493,7 +2493,7 @@ function prepareCronReply(text: string, tools: string[]): CronPreparedReply {
   }
 
   if (!body.trim() && extracted.attachments.length === 0) {
-    body = "(无回复)";
+    body = "(no reply)";
   }
 
   return {
@@ -2519,7 +2519,7 @@ function prepareReply(
   }
 
   if (!body.trim() && extracted.attachments.length === 0) {
-    body = "(无回复)";
+    body = "(no reply)";
   }
 
   return {
@@ -2546,7 +2546,7 @@ async function sendPreparedReply(
         const sent = await tgCtx.reply(html, { parse_mode: "HTML", ...(opts ?? {}) });
         rememberReplyMessage(replyScopeKey(tgCtx), "self", sent.message_id, part);
       } catch (err) {
-        log.warn(`chat${tgCtx.chat?.id ?? 0} HTML 发送失败，降级纯文本：${describeTelegramSendError(err)}`);
+        log.warn(`chat${tgCtx.chat?.id ?? 0} HTML send failed, falling back to plain text: ${describeTelegramSendError(err)}`);
         const safePart = stripProtocolTags(part);
         const plain = mdToPlainText(safePart);
         const sent = await tgCtx.reply(plain, opts);
@@ -2572,8 +2572,8 @@ async function sendAttachments(
 ): Promise<void> {
   if (warnings.length) {
     const preview = warnings.slice(0, 3).join("\n");
-    const more = warnings.length > 3 ? `\n... 还有 ${warnings.length - 3} 条` : "";
-    await tgCtx.reply(`⚠️ 附件解析告警：\n${preview}${more}`).catch(() => {});
+    const more = warnings.length > 3 ? `\n... and ${warnings.length - 3} items in queue` : "";
+    await tgCtx.reply(`⚠️ Attachment parse warnings: \n${preview}${more}`).catch(() => {});
   }
 
   let first = true;
@@ -2584,7 +2584,7 @@ async function sendAttachments(
         : undefined;
       await sendOneAttachment(tgCtx, att, opts);
     } catch (err) {
-      await tgCtx.reply(`❌ 附件发送失败：${att.label || "未知附件"}\n${(err as Error).message}`).catch(() => {});
+      await tgCtx.reply(`❌ Attachment send failed: ${att.label || "Unknown attachment"}\n${(err as Error).message}`).catch(() => {});
     }
     first = false;
   }
@@ -2652,17 +2652,17 @@ async function sendReply(
 }
 
 const CRON_HELP_TEXT = [
-  "⏰ /cron 用法",
-  "- /cron（打开交互菜单）",
+  "⏰ /cron usage",
+  "- /cron (open interactive menu)",
   "- /cron list",
   "- /cron stat",
-  "- /cron add at <ISO时间> <内容>（可用 名称||内容 指定任务名）",
-  "- /cron add every <间隔> <内容>（如 10m、2h、1d；可用 名称||内容）",
-  "- /cron add cron \"<表达式>\" [时区] <内容>（可用 名称||内容）",
+  "- /cron add at <ISO-time> <content> (use name||content to set job name)",
+  "- /cron add every <interval> <content> (e.g. 10m, 2h, 1d; use name||content)",
+  "- /cron add cron \"<expression>\" [timezone] <content> (use name||content)",
   "- /cron on <id>",
   "- /cron off <id>",
   "- /cron del <id>",
-  "- /cron rename <id> <新名称>",
+  "- /cron rename <id> <new name>",
   "- /cron run <id>",
 ].join("\n");
 
@@ -2768,7 +2768,7 @@ function formatCronSchedule(schedule: CronSchedule): string {
     case "at":
       return `at ${formatDateTime(schedule.atMs)}`;
     case "every":
-      return `every ${formatCompactDuration(schedule.everyMs)}（anchor=${formatDateTime(schedule.anchorMs)}）`;
+      return `every ${formatCompactDuration(schedule.everyMs)}（anchor=${formatDateTime(schedule.anchorMs)})`;
     case "cron":
       return `cron "${schedule.expr}" @${schedule.timezone}`;
     default:
@@ -2792,11 +2792,11 @@ function formatCronJobLine(job: CronJobRecord): string {
 
 function formatCronStatus(st: { enabled: boolean; totalJobs: number; enabledJobs: number; runningJobs: number; queuedJobs: number; nextRunAtMs?: number }): string {
   return [
-    `⏰ 定时服务：${st.enabled ? "开启" : "关闭"}`,
-    `总任务：${st.totalJobs}`,
-    `启用：${st.enabledJobs}`,
-    `运行中：${st.runningJobs}`,
-    `队列中：${st.queuedJobs}`,
-    `最近下次触发：${formatDateTime(st.nextRunAtMs)}`,
+    `⏰ Cron service: ${st.enabled ? "On" : "Off"}`,
+    `Total tasks: ${st.totalJobs}`,
+    `Enabled: ${st.enabledJobs}`,
+    `Running: ${st.runningJobs}`,
+    `Queued: ${st.queuedJobs}`,
+    `Next trigger: ${formatDateTime(st.nextRunAtMs)}`,
   ].join("\n");
 }
