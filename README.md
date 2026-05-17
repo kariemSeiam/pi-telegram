@@ -104,8 +104,8 @@ Replying to a historical message includes the quoted content as context.
 | Command | Action |
 |---------|--------|
 | `/new` | Start a new session |
-| `/abort` | Abort current task |
-| `/abortall` | Abort current task + clear queue |
+| `/kill` | Kill current task |
+| `/killall` | Kill current task + clear queue |
 | `/compact [instructions]` | Compact session context |
 | `/steer <message>` | Send a steering message mid-run |
 | `/fork` | Branch from a previous message |

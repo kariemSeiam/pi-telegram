@@ -55,8 +55,8 @@ src/
 | Command | Action |
 |---|---|
 | `/new` | Create new session |
-| `/abort` | Abort current + cancel queue |
-| `/abortall` | Cancel all queued prompts |
+| `/kill` | Kill current operation |
+| `/killall` | Kill and clear all queued prompts |
 | `/compact` | Compact context (if idle) |
 | `/steer <msg>` | Send steering message |
 | `/undo` | Undo last reply + fork |

@@ -291,7 +291,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     }
   });
 
-  commandGroup.command("abort", "Abort current operation", async (tgCtx) => {
+  commandGroup.command("kill", "Kill current operation", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
@@ -309,7 +309,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 
     if (stopped.aborted) {
       if (queued > 0) {
-        await tgCtx.reply(`📥 Queue retained ${queued} items, continuing\nUse /abortall to clear the queue`);
+        await tgCtx.reply(`📥 Queue retained ${queued} items, continuing\nUse /killall to clear the queue`);
       }
       return;
     }
@@ -322,7 +322,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     await tgCtx.reply("No active operation");
   });
 
-  commandGroup.command("abortall", "Abort and clear queue", async (tgCtx) => {
+  commandGroup.command("killall", "Kill and clear queue", async (tgCtx) => {
     const chatId = tgCtx.chat.id;
     const key = chatKey(botKey, chatId);
     const inst = pool.has(key);
@@ -360,7 +360,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
     }
 
     if (inst.streaming) {
-      await tgCtx.reply("⏳ Currently generating, /abort first");
+      await tgCtx.reply("⏳ Currently generating, /kill first");
       return;
     }
 
@@ -1498,14 +1498,14 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
           }
 
           if (abortDirective.showAbortNotice) {
-            await tgCtx.reply("🛑 Aborted").catch(() => {});
+            await tgCtx.reply("💀 Killed").catch(() => {});
           }
         } else if (consumeAbortNoticeSuppression(chatId)) {
           await status?.delete().catch(() => {});
         } else if (status) {
-          await reportStatusOrReply(tgCtx, status, "🛑 Aborted");
+          await reportStatusOrReply(tgCtx, status, "💀 Killed");
         } else {
-          await tgCtx.reply("🛑 Aborted").catch(() => {});
+          await tgCtx.reply("💀 Killed").catch(() => {});
         }
       } else if (useStream && streamedText.trim()) {
         const errLine = `⚠️ Generation interrupted: ${truncate(message, 300)}`;
