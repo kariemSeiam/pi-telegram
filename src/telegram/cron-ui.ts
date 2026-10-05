@@ -1,5 +1,7 @@
 // src/telegram/cron-ui.ts — cron menu, cron input handling, cron directive execution
 import { Menu } from "@grammyjs/menu";
+import { InlineKeyboard } from "grammy";
+import { describe as describeCron, needsApproval, park, take } from "./cron-approval.js";
 import { log } from "../shared/log.js";
 import type { CronSchedule, CronJobRecord } from "../cron/types.js";
 import type { TgCronDirective } from "../cron/directives.js";
@@ -302,7 +304,31 @@ export async function applyCronToolDirectives(
 	const notices: string[] = [];
 	const chatId = tgCtx.chat?.id ?? 0;
 
+	const userId = tgCtx.from?.id ?? 0;
 	for (const directive of extracted.directives) {
+		// Model-issued changes need a human tap. Read-only list/stat run directly.
+		if (needsApproval(directive)) {
+			const p = park(chatId, userId, directive);
+			if (!p) {
+				warnings.push("Too many pending cron approvals in this chat; ignoring request");
+				continue;
+			}
+			try {
+				await tgCtx.api.sendMessage(
+					chatId,
+					`🔐 The assistant wants to change scheduled tasks:\n\n${describeCron(directive)}\n\nApprove? (expires in 5 min)`,
+					{
+						reply_markup: new InlineKeyboard()
+							.text("✅ Approve", `cronok:${p.token}`)
+							.text("❌ Reject", `cronno:${p.token}`),
+					},
+				);
+				notices.push(`⏳ Waiting for your approval: ${directive.action}`);
+			} catch (err) {
+				warnings.push(`tg-cron approval prompt failed: ${(err as Error).message}`);
+			}
+			continue;
+		}
 		try {
 			const res = await executeCronDirectiveForChat(shared, chatId, directive);
 			notices.push(...res.notices);
@@ -999,6 +1025,39 @@ export function registerCronCommand(
 					`❌ Cron operation failed: ${truncate((err as Error).message, 1000)}`,
 				)
 				.catch(() => {});
+		}
+	});
+}
+
+
+// --- approval callbacks (cronok:<token> / cronno:<token>) ---
+
+export function registerCronApprovalHandlers(
+	bot: { callbackQuery: (re: RegExp, fn: (ctx: BotContext) => Promise<unknown>) => unknown },
+	shared: SharedBotState,
+): void {
+	bot.callbackQuery(/^cron(ok|no):([0-9a-f]{16})$/, async (ctx) => {
+		const m = /^cron(ok|no):([0-9a-f]{16})$/.exec(String((ctx as any).callbackQuery?.data ?? ""));
+		const chatId = ctx.chat?.id;
+		const userId = ctx.from?.id;
+		if (!m || chatId === undefined || userId === undefined) return;
+		const taken = take(m[2], chatId, userId);
+		if (!taken) {
+			await ctx.answerCallbackQuery({ text: "Expired or not yours", show_alert: true }).catch(() => {});
+			return;
+		}
+		if (m[1] === "no") {
+			await ctx.answerCallbackQuery({ text: "Rejected" }).catch(() => {});
+			await ctx.editMessageText(`❌ Rejected\n\n${describeCron(taken.directive)}`).catch(() => {});
+			return;
+		}
+		try {
+			const res = await executeCronDirectiveForChat(shared, chatId, taken.directive);
+			await ctx.answerCallbackQuery({ text: "Done" }).catch(() => {});
+			await ctx.editMessageText([`✅ Approved\n\n${describeCron(taken.directive)}`, ...res.notices, ...res.warnings].join("\n\n")).catch(() => {});
+		} catch (err) {
+			await ctx.answerCallbackQuery({ text: "Failed" }).catch(() => {});
+			await ctx.editMessageText(`⚠️ Failed: ${(err as Error).message}`).catch(() => {});
 		}
 	});
 }

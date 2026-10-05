@@ -53,6 +53,7 @@ import {
 	setupCronExecutor,
 	registerCronCommand,
 	applyCronToolDirectives,
+	registerCronApprovalHandlers,
 	consumePendingCronInput,
 } from "./cron-ui.js";
 
@@ -160,6 +161,7 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 	const cronMenu = createCronMenu(shared);
 	bot.use(cronMenu);
 	registerCronCommand(shared, commandGroup, cronMenu);
+	registerCronApprovalHandlers(bot as any, shared);
 
 	// --- prompt execution ---
 	function nextDraftId(chatId: number): number {
