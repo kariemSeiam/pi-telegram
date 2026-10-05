@@ -15,6 +15,7 @@ import {
   shouldCheckUpdatesOnStartup,
 } from "../shared/version.js";
 import { createSettingsWriter, ensureSettingsFileExists, normalizeCronConfig, normalizeStreamByChat, readAppConfig } from "./config.js";
+import { configureAttachmentRoots } from "../shared/path-policy.js";
 import { cronRoot, defaultWorkspace, ensureAppDirectories, sessionsRoot, settingsPath, telegramRoot } from "./paths.js";
 
 const bots: Array<{ stop: () => Promise<void> }> = [];
@@ -218,6 +219,13 @@ export async function runApp(): Promise<void> {
     }
 
     const cwd = botCfg.cwd || defaultWorkspace;
+    const ids = (botCfg.allowedUsers ?? []);
+    if (!ids.length || ids.some((x) => typeof x !== "number" || !Number.isSafeInteger(x))) {
+      throw new Error(
+        `Bot "${botCfg.name || i}": allowedUsers must be a non-empty list of numeric Telegram user IDs (usernames are not accepted). Refusing to start.`,
+      );
+    }
+    configureAttachmentRoots([cwd]);
     const botName = botCfg.name || `bot${i}`;
     const sessionBaseDir = resolve(sessionsRoot, botName);
 

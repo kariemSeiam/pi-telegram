@@ -3,7 +3,8 @@
 export interface BotConfig {
   token: string;
   name: string;
-  allowedUsers: (number | string)[];
+  /** Numeric Telegram user IDs only. Usernames are mutable and can be re-registered. */
+  allowedUsers: number[];
   cwd: string;
   streamByChat?: Record<string, boolean>;
 }

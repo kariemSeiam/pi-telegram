@@ -87,6 +87,19 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 	bot.use(hydrate());
 	bot.use(autoChatAction());
 
+	// --- auth guard (fail closed) ---
+	// Always installed. An empty allowlist means nobody is allowed, never everybody.
+	const allowed = new Set(
+		(config.allowedUsers ?? []).filter((id): id is number => typeof id === "number" && Number.isSafeInteger(id)),
+	);
+	bot.use(async (tgCtx, next) => {
+		const uid = tgCtx.from?.id;
+		if (uid !== undefined && allowed.has(uid)) return next();
+		if (tgCtx.chat?.type === "private") {
+			await tgCtx.reply("⛔ Unauthorized");
+		}
+	});
+
 	// --- error handler ---
 	bot.catch((err) => {
 		const e = err.error;
@@ -114,21 +127,6 @@ export function createBot(opts: CreateBotOptions): Bot<BotContext> {
 	bot.use(modelMenu);
 	bot.use(streamMenu);
 	bot.use(thinkingMenu);
-
-	// --- auth guard ---
-	if (config.allowedUsers.length) {
-		bot.use(async (tgCtx, next) => {
-			const uid = tgCtx.from?.id;
-			const uname = tgCtx.from?.username;
-			if (
-				config.allowedUsers.includes(uid!) ||
-				config.allowedUsers.includes(uname!)
-			) {
-				return next();
-			}
-			await tgCtx.reply("⛔ Unauthorized");
-		});
-	}
 
 	// --- shared state ---
 	const shared: SharedBotState = {

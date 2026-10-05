@@ -1,6 +1,7 @@
 // src/telegram/attachment.ts — parse AI attachment blocks and build grammY media inputs
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { InputFile } from "grammy";
+import { checkLocalAttachmentPath } from "../shared/path-policy.js";
 
 export type TgAttachmentKind =
   | "photo"
@@ -83,30 +84,23 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
         warnings.push(`Attachment ${label} has an invalid URL`);
         continue;
       }
-      try {
-        const media = filename
-          ? new InputFile(new URL(url), filename)
-          : new InputFile(new URL(url));
-        attachments.push({ kind, media, label });
-      } catch {
-        warnings.push(`Attachment ${label} URL parse failed`);
-      }
+      // Hand Telegram the URL string so *Telegram's* servers fetch it. Wrapping it in
+      // InputFile(new URL(...)) would make this host fetch it, which lets the model
+      // reach loopback/internal services (SSRF).
+      attachments.push({ kind, media: new URL(url).toString(), label });
       continue;
     }
 
     if (localPath) {
-      if (!existsSync(localPath)) {
-        warnings.push(`Attachment ${label} local path does not exist`);
+      const verdict = checkLocalAttachmentPath(localPath);
+      if (!verdict.ok) {
+        warnings.push(`Attachment ${label} blocked: ${verdict.reason}`);
         continue;
       }
+      const safePath = verdict.real;
       let size = 0;
       try {
-        const st = statSync(localPath);
-        if (!st.isFile()) {
-          warnings.push(`Attachment ${label} local path is not a file`);
-          continue;
-        }
-        size = st.size;
+        size = statSync(safePath).size;
       } catch {
         warnings.push(`Attachment ${label} local path cannot be read`);
         continue;
@@ -117,7 +111,7 @@ export function extractTgAttachments(input: string): AttachmentExtraction {
         continue;
       }
 
-      const media = filename ? new InputFile(localPath, filename) : new InputFile(localPath);
+      const media = filename ? new InputFile(safePath, filename) : new InputFile(safePath);
       attachments.push({ kind, media, label });
       continue;
     }
