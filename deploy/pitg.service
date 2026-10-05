@@ -1,0 +1,51 @@
+# Hardened unit for Pi-Telegram. Copy to /etc/systemd/system/pitg.service.
+# Runs as an unprivileged user inside a private view of the filesystem so a
+# prompt-injected agent cannot read host secrets or modify the system.
+[Unit]
+Description=Pi-Telegram bridge (hardened)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pitg
+Group=pitg
+WorkingDirectory=/var/lib/pitg/workspace
+Environment=HOME=/var/lib/pitg
+ExecStart=/usr/bin/env node /opt/pi-telegram/dist/main.js
+Restart=on-failure
+RestartSec=5
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/pitg
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+
+# --- privileges ---
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+UMask=0077
+
+# --- network: Telegram + the model provider only need outbound IP ---
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# --- resource caps (a looping agent must not eat the box) ---
+MemoryMax=1G
+TasksMax=256
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
