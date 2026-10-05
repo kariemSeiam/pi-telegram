@@ -168,6 +168,8 @@ export async function sendAttachments(
 	}
 }
 
+const RICH_MESSAGES = process.env.PITG_RICH_MESSAGES === "1";
+
 export async function sendPreparedReply(
 	tgCtx: BotContext,
 	prepared: PreparedReply,
@@ -182,7 +184,22 @@ export async function sendPreparedReply(
 					? { reply_parameters: prepared.replyParameters }
 					: undefined;
 			try {
-				const sent = await tgCtx.reply(html, {
+				// Opt-in (PITG_RICH_MESSAGES=1): Telegram Rich Messages keep tables,
+				// collapsible details and formulas. Any failure falls through to HTML.
+				let sent: { message_id: number } | undefined;
+				if (RICH_MESSAGES) {
+					try {
+						sent = await tgCtx.replyWithRichMessage(
+							{ markdown: stripProtocolTags(part) },
+							opts,
+						);
+					} catch (richErr) {
+						log.warn(
+							`chat${tgCtx.chat?.id ?? 0} rich send failed, falling back to HTML: ${describeTelegramSendError(richErr)}`,
+						);
+					}
+				}
+				sent ??= await tgCtx.reply(html, {
 					parse_mode: "HTML",
 					...(opts ?? {}),
 				});

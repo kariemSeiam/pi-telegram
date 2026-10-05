@@ -34,6 +34,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
   const modelCacheAt = new Map<number, number>();        // chatId -> cache timestamp
   const activeModelId = new Map<number, string>();       // chatId -> provider:modelId
   const activeThinkingLevel = new Map<number, string>(); // chatId -> thinking level
+  const availableThinkingLevels = new Map<number, string[]>(); // chatId -> levels the current model accepts
   const streamEnabled = new Map<number, boolean>();      // chatId -> stream mode
 
   const MODEL_CACHE_TTL_MS = 30_000;
@@ -46,6 +47,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
 
   const modelsLoading = new Map<number, Promise<PiModelInfo[]>>();
   const thinkingLoading = new Map<number, Promise<string>>();
+  const thinkingLevelsLoading = new Map<number, Promise<string[]>>();
 
   const isStreamEnabled = (chatId: number): boolean => streamEnabled.get(chatId) ?? true;
 
@@ -81,6 +83,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       case "medium": return "Medium";
       case "high": return "High";
       case "xhigh": return "Extra High";
+      case "max": return "Max";
       default: return level;
     }
   }
@@ -89,7 +92,9 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
     const s = state as any;
     const m = s.model;
     if (m?.provider && m?.id) {
-      activeModelId.set(chatId, modelKey(String(m.provider), String(m.id)));
+      const key = modelKey(String(m.provider), String(m.id));
+      if (activeModelId.get(chatId) !== key) availableThinkingLevels.delete(chatId);
+      activeModelId.set(chatId, key);
     }
     if (s.thinkingLevel) {
       activeThinkingLevel.set(chatId, String(s.thinkingLevel));
@@ -156,7 +161,8 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
     return task;
   }
 
-  async function supportsThinkingForChat(chatId: number): Promise<boolean> {
+  /** Legacy path: infer support from model metadata when pi can't list levels. */
+  async function inferThinkingSupportForChat(chatId: number): Promise<boolean> {
     const inst = pool.get(chatKey(chatId));
 
     try {
@@ -176,7 +182,41 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
     return selected?.reasoning ?? true;
   }
 
-  const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+  const FALLBACK_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+
+  async function refreshThinkingLevelsForChat(chatId: number): Promise<string[]> {
+    const inst = pool.get(chatKey(chatId));
+    try {
+      // Sync model first so a model switch drops stale levels before we cache new ones.
+      syncState(chatId, await inst.getState());
+      const levels = [...new Set((await inst.getAvailableThinkingLevels()).map((l) => l.trim()).filter(Boolean))];
+      if (levels.length > 0) {
+        availableThinkingLevels.set(chatId, levels);
+        return levels;
+      }
+    } catch { /* older pi: fall back to model metadata */ }
+    const supported = await inferThinkingSupportForChat(chatId);
+    const fallback = supported ? [...FALLBACK_THINKING_LEVELS] : ["off"];
+    availableThinkingLevels.set(chatId, fallback);
+    return fallback;
+  }
+
+  async function ensureThinkingLevelsForChat(chatId: number): Promise<string[]> {
+    const cached = availableThinkingLevels.get(chatId);
+    if (cached) return cached;
+    const loading = thinkingLevelsLoading.get(chatId);
+    if (loading) return loading;
+    const task = refreshThinkingLevelsForChat(chatId).finally(() => {
+      thinkingLevelsLoading.delete(chatId);
+    });
+    thinkingLevelsLoading.set(chatId, task);
+    return task;
+  }
+
+  async function supportsThinkingForChat(chatId: number): Promise<boolean> {
+    const levels = await ensureThinkingLevelsForChat(chatId);
+    return levels.some((level) => level !== "off");
+  }
 
   const modelMenu = new Menu<C>(`model-menu-${botIndex}`, {
     onMenuOutdated: outdatedMenuText,
@@ -279,6 +319,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
               const inst = pool.get(chatKey(cid));
               await inst.rpcSetModel(mo.provider, mo.id);
               activeModelId.set(cid, keyOfModel);
+              availableThinkingLevels.delete(cid);
               try { await refreshThinkingForChat(cid); } catch { /* ignore */ }
             } catch (err) {
               await ctx.answerCallbackQuery({ text: `❌ ${(err as Error).message}` });
@@ -368,7 +409,8 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       const chatId = ctx.chat?.id ?? 0;
       const supported = await supportsThinkingForChat(chatId);
       const current = supported ? await ensureThinkingForChat(chatId) : "";
-      return `thinking:supported=${supported ? 1 : 0}:current=${current}`;
+      const levels = supported ? (await ensureThinkingLevelsForChat(chatId)).join(",") : "";
+      return `thinking:supported=${supported ? 1 : 0}:current=${current}:levels=${levels}`;
     },
   })
     .dynamic(async (ctx, range) => {
@@ -382,10 +424,12 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
       }
 
       const current = await ensureThinkingForChat(chatId);
+      const levels = await ensureThinkingLevelsForChat(chatId);
 
       range.text("🔄 Refresh Status", async (ctx) => {
         const cid = ctx.chat?.id ?? 0;
         try {
+          availableThinkingLevels.delete(cid);
           await refreshThinkingForChat(cid);
           try { ctx.menu.update(); } catch { /* ignore idempotent menu update */ }
           await ctx.answerCallbackQuery({ text: "Thinking status refreshed" });
@@ -395,7 +439,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
         }
       }).row();
 
-      for (const level of thinkingLevels) {
+      for (const [idx, level] of levels.entries()) {
         const check = current === level ? "✅ " : "";
         range.text(`${check}${thinkingLabel(level)}`, async (ctx) => {
           const cid = ctx.chat?.id ?? 0;
@@ -416,9 +460,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
           }
         });
 
-        if (level === "minimal" || level === "medium" || level === "xhigh") {
-          range.row();
-        }
+        if (idx % 3 === 2) range.row();
       }
     });
 
