@@ -28,6 +28,8 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
   const { botIndex, botKey, pool } = opts;
   const outdatedMenuText = opts.outdatedMenuText ?? "Menu updated, please try again";
 
+  const MODEL_MENU_PAGE_SIZE = 10;
+
   const cachedModels = new Map<number, PiModelInfo[]>(); // chatId -> models
   const modelCacheAt = new Map<number, number>();        // chatId -> cache timestamp
   const activeModelId = new Map<number, string>();       // chatId -> provider:modelId
@@ -223,6 +225,8 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
     if (registeredSubs.has(subId)) return;
     registeredSubs.add(subId);
 
+    const providerMenuPageByChat = new Map<number, number>();
+
     const sub = new Menu<C>(subId, {
       onMenuOutdated: outdatedMenuText,
       fingerprint: async (ctx) => {
@@ -239,6 +243,13 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
         const chatId = ctx.chat?.id ?? 0;
         const models = await ensureModelsForChat(chatId);
         const current = activeModelId.get(chatId);
+        const providerModels = models.filter((m) => m.provider === provider);
+        const totalPages = Math.max(1, Math.ceil(providerModels.length / MODEL_MENU_PAGE_SIZE));
+        const rawPage = providerMenuPageByChat.get(chatId) ?? 0;
+        const page = Math.max(0, Math.min(rawPage, totalPages - 1));
+        providerMenuPageByChat.set(chatId, page);
+        const start = page * MODEL_MENU_PAGE_SIZE;
+        const pageModels = providerModels.slice(start, start + MODEL_MENU_PAGE_SIZE);
 
         range.text("🔄 Refresh", async (ctx) => {
           const cid = ctx.chat?.id ?? 0;
@@ -252,8 +263,7 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
           }
         }).row();
 
-        for (const mo of models) {
-          if (mo.provider !== provider) continue;
+        for (const mo of pageModels) {
           const keyOfModel = modelKey(mo.provider, mo.id);
           const check = current === keyOfModel ? "✅ " : "";
           const reasoning = mo.reasoning ? " · 🧠" : "";
@@ -279,6 +289,27 @@ export function createBotMenus<C extends Context>(opts: CreateBotMenusOptions): 
             await ctx.answerCallbackQuery({ text: `✅ Switched to: ${mo.name}` });
           }).row();
         }
+
+        if (totalPages > 1) {
+          range.text("⬅️ Prev", async (ctx) => {
+            const cid = ctx.chat?.id ?? 0;
+            const newPage = Math.max(0, page - 1);
+            providerMenuPageByChat.set(cid, newPage);
+            try { ctx.menu.update(); } catch { /* ignore */ }
+            await ctx.answerCallbackQuery({ text: `Page ${newPage + 1}/${totalPages}` });
+          });
+          range.text(`📄 ${page + 1}/${totalPages}`, (ctx) =>
+            ctx.answerCallbackQuery({ text: `Page ${page + 1} of ${totalPages}` })
+          );
+          range.text("➡️ Next", async (ctx) => {
+            const cid = ctx.chat?.id ?? 0;
+            const newPage = Math.min(totalPages - 1, page + 1);
+            providerMenuPageByChat.set(cid, newPage);
+            try { ctx.menu.update(); } catch { /* ignore */ }
+            await ctx.answerCallbackQuery({ text: `Page ${newPage + 1}/${totalPages}` });
+          }).row();
+        }
+
         range.back("⬅️ Back", (ctx) => ctx.answerCallbackQuery());
       });
 
