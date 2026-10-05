@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 // src/app/runtime.ts — app assembly and startup orchestration
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,6 +16,7 @@ import {
   shouldCheckUpdatesOnStartup,
 } from "../shared/version.js";
 import { createSettingsWriter, ensureSettingsFileExists, normalizeCronConfig, normalizeStreamByChat, readAppConfig } from "./config.js";
+import { configureAttachmentRoots } from "../shared/path-policy.js";
 import { cronRoot, defaultWorkspace, ensureAppDirectories, sessionsRoot, settingsPath, telegramRoot } from "./paths.js";
 
 const bots: Array<{ stop: () => Promise<void> }> = [];
@@ -208,6 +210,7 @@ export async function runApp(): Promise<void> {
   }
   const toolSystemPromptArg = toolSystemPrompt ? toolSystemPromptFile : "";
 
+  const attachmentRoots: string[] = [];
   for (let i = 0; i < config.bots.length; i++) {
     const botCfg = config.bots[i];
     const hasStreamByChat = Object.prototype.hasOwnProperty.call(botCfg, "streamByChat");
@@ -218,6 +221,18 @@ export async function runApp(): Promise<void> {
     }
 
     const cwd = botCfg.cwd || defaultWorkspace;
+    const cwdResolved = resolve(cwd);
+    if (cwdResolved === "/" || cwdResolved === homedir() || cwdResolved === resolve(homedir(), ".pi")) {
+      throw new Error(`Bot "${botCfg.name || i}": cwd "${cwd}" is too broad (root/home/.pi). Use a dedicated workspace directory.`);
+    }
+    const ids = (botCfg.allowedUsers ?? []);
+    if (!ids.length || ids.some((x) => typeof x !== "number" || !Number.isSafeInteger(x))) {
+      throw new Error(
+        `Bot "${botCfg.name || i}": allowedUsers must be a non-empty list of numeric Telegram user IDs (usernames are not accepted). Refusing to start.`,
+      );
+    }
+    attachmentRoots.push(cwd);
+    configureAttachmentRoots(attachmentRoots);
     const botName = botCfg.name || `bot${i}`;
     const sessionBaseDir = resolve(sessionsRoot, botName);
 
